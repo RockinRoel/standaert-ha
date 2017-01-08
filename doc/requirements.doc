@@ -4,23 +4,40 @@
 ** Signals:
 *** onPressStart
 *** onPressEnd
+** State:
+*** down/up
 * Light (combination of IO expander and port number)
 ** Slots:
 *** turnOn
 *** turnOff
+*** toggle
 ** Signals:
-*** whenTurnedOn
-*** whenTurnedOff
+*** onStateChange(bool)
+** State:
+*** on/off
 * Light group (multiple lights that can be switched simultaneously)
 ** Slots:
 *** turnOn
 *** turnOff
+*** toggle (what if not all on/not all off?)
 ** Signals:
-*** whenTurnedOn
-*** whenTurnedOff
+*** onStateChange(bool)
+** State:
+*** on/off/indeterminate
 * Timer
 ** Slots:
-*** start
-*** cancel
+*** start (maybe with id dependent on button pressed)
+*** cancel (maybe with id depndent on button released)
 ** Signals:
 *** onTimeout
+** State:
+*** active/inactive
+* System
+** Slots:
+*** turnOffAllLights
+
+.Actions are defined with:
+* Signal
+* Filters (on signal arguments)
+* Conditions (dependent on state before signal)
+* Effect (with arguments in some cases)
