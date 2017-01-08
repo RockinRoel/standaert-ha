@@ -15,6 +15,10 @@
 *** onStateChange(bool)
 ** State:
 *** on/off
+** Configuration:
+*** name
+*** IO expander
+*** port number
 * Light group (multiple lights that can be switched simultaneously)
 ** Slots:
 *** turnOn
@@ -24,6 +28,9 @@
 *** onStateChange(bool)
 ** State:
 *** on/off/indeterminate
+** Configuration:
+*** name
+*** Lights
 * Timer
 ** Slots:
 *** start (maybe with id dependent on button pressed)
@@ -32,6 +39,9 @@
 *** onTimeout
 ** State:
 *** active/inactive
+** Configuration:
+*** name
+*** duration
 * System
 ** Slots:
 *** turnOffAllLights
@@ -39,5 +49,22 @@
 .Actions are defined with:
 * Signal
 * Filters (on signal arguments)
-* Conditions (dependent on state before signal)
-* Effect (with arguments in some cases)
+* Actions:
+** Conditions (dependent on state before signal)
+** Effects (with arguments in some cases)
+
+.Scenarios:
+* When a button is pressed, toggle a light
+** Signal: button.onPressStart
+** Filters: none
+** Actions: 1
+*** Conditions: none
+*** Effects: light.toggle
+* When a button is pressed, toggle a light group (if some are on, turn all on)
+** Signal: button.onPressStart
+** Filters: none
+** Actions: 1
+*** Conditions: none
+*** Effects: lightGroup.toggle (if inconsistent, on)
+* Long press of N seconds turns all lights off
+** TODO
