@@ -1,5 +1,8 @@
 #include <iostream>
 
+#include "config/model.hpp"
+#include "config/conditions.hpp"
+
 using namespace std;
 
 int main(int argc, char *argv[])
