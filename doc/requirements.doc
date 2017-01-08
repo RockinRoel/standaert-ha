@@ -1,0 +1,26 @@
+.Entities
+* MCP23017 (real hardware)
+* Button (combination of IO expander and port number)
+** Signals:
+*** onPressStart
+*** onPressEnd
+* Light (combination of IO expander and port number)
+** Slots:
+*** turnOn
+*** turnOff
+** Signals:
+*** whenTurnedOn
+*** whenTurnedOff
+* Light group (multiple lights that can be switched simultaneously)
+** Slots:
+*** turnOn
+*** turnOff
+** Signals:
+*** whenTurnedOn
+*** whenTurnedOff
+* Timer
+** Slots:
+*** start
+*** cancel
+** Signals:
+*** onTimeout
