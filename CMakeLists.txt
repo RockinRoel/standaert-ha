@@ -1,12 +1,16 @@
 project(standaert-ha)
 cmake_minimum_required(VERSION 2.8)
 
-SET(WT_PREFIX "/home/roel/work/wt4/install/debug")
-SET(BOOST_PREFIX "/usr")
+SET(WT_PREFIX "/usr" CACHE PATH "The Wt installation prefix")
+SET(BOOST_PREFIX "/usr" CACHE PATH "The Boost installation prefix")
+SET(ZLIB_PREFIX "/usr" CACHE PATH "The zlib installation prefix")
+SET(SSL_PREFIX "/usr" CACHE PATH "The OpenSSL installation prefix")
 
 link_directories(
   "${WT_PREFIX}/lib"
   "${BOOST_PREFIX}/lib"
+  "${ZLIB_PREFIX}/lib"
+  "${SSL_PREFIX}/lib"
 )
 
 include_directories(
@@ -24,4 +28,8 @@ set(SRC_LIST
 )
 
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-target_link_libraries(${PROJECT_NAME} wtd wthttpd)
+target_link_libraries(${PROJECT_NAME}
+  debug wthttpd optimized wthttp
+  debug wtd optimized wt
+  z ssl crypto
+  boost_system boost_filesystem boost_program_options boost_thread)

@@ -3,10 +3,12 @@
 #include "config/model.hpp"
 #include "config/conditions.hpp"
 
-using namespace std;
+#include <Wt/WApplication.h>
+#include <Wt/WServer.h>
 
 int main(int argc, char *argv[])
 {
-  cout << "Hello World!" << endl;
-  return 0;
+  return Wt::WRun(argc, argv, [](const Wt::WEnvironment &env) {
+    return Wt::cpp14::make_unique<Wt::WApplication>(env);
+  });
 }
