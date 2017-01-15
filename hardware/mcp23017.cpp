@@ -93,7 +93,7 @@ static constexpr const char* registerToString(MCP23017_IOCON0_REGISTER reg)
 
 int test_i2c()
 {
-  int fd = open("/dev/i2c-0", O_RDWR);
+  int fd = open("/dev/i2c-0", O_RDWR|O_CLOEXEC|O_SYNC);
   if (fd < 0) {
     std::cout << "ERROR OPENING I2C DEV" << std::endl;
     return 1;

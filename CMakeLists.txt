@@ -39,3 +39,8 @@ set(I2C_TEST_SRC_LIST
   hardware/mcp23017.cpp
 )
 add_executable(i2c_test ${I2C_TEST_SRC_LIST})
+
+set(GPIO_TEST_SRC_LIST
+  gpio_test.cpp
+)
+add_executable(gpio_test ${GPIO_TEST_SRC_LIST})
