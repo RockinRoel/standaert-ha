@@ -33,3 +33,9 @@ target_link_libraries(${PROJECT_NAME}
   debug wtd optimized wt
   z ssl crypto
   boost_system boost_filesystem boost_program_options boost_thread)
+
+set(I2C_TEST_SRC_LIST
+  i2c_test.cpp
+  hardware/mcp23017.cpp
+)
+add_executable(i2c_test ${I2C_TEST_SRC_LIST})
