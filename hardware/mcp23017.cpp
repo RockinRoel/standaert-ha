@@ -7,6 +7,7 @@
 #include <linux/i2c-dev.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <unistd.h>
 
 static constexpr int address = 0x20;
@@ -95,6 +96,11 @@ int test_i2c()
   int fd = open("/dev/i2c-0", O_RDWR);
   if (fd < 0) {
     std::cout << "ERROR OPENING I2C DEV" << std::endl;
+    return 1;
+  }
+
+  if (flock(fd, LOCK_EX) < 0) {
+    std::cout << "ERROR PLACING EXCLUSIVE LOCK ON I2C DEV" << std::endl;
     return 1;
   }
 
