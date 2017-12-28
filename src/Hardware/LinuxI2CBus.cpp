@@ -52,7 +52,7 @@ std::vector<std::uint8_t> LinuxI2CBus::read(std::uint8_t chipAddress, std::uint8
   return output;
 }
 
-void LinuxI2CBus::write(std::uint8_t chipAddress, std::uint8_t dataAddress, std::vector<std::uint8_t> data)
+void LinuxI2CBus::write(std::uint8_t chipAddress, std::uint8_t dataAddress, const std::vector<std::uint8_t> &data)
 {
   if (ioctl(fd_, I2C_SLAVE, chipAddress) < 0) {
     std::cerr << "Err\n"; // TODO(Roel)

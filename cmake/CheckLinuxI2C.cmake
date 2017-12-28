@@ -1,0 +1,15 @@
+if(UNIX AND NOT APPLE)
+    include(CheckIncludeFiles)
+
+    CHECK_INCLUDE_FILES("linux/i2c-dev.h" HAVE_LINUX_I2C_DEV_H)
+
+    if(HAVE_LINUX_I2C_DEV_H)
+        set(LINUX_I2C_ENABLED ON)
+        message(STATUS "Found <linux/i2c-dev.h>, enabling Linux I2C support")
+    else()
+        set(LINUX_I2C_ENABLE OFF)
+        message(STATUS "Did not find <linux/i2c-dev.h>, not enabling Linux I2C support.")
+    endif()
+else()
+    message(STATUS "Disabling Linux I2C support, not a Linux system")
+endif()

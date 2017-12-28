@@ -13,7 +13,7 @@ public:
   ~LinuxI2CBus();
 
   virtual std::vector<std::uint8_t> read(std::uint8_t chipAddress, std::uint8_t dataAddress, std::size_t count) override;
-  virtual void write(std::uint8_t chipAddress, std::uint8_t dataAddress, std::vector<std::uint8_t> data) override;
+  virtual void write(std::uint8_t chipAddress, std::uint8_t dataAddress, const std::vector<std::uint8_t> &data) override;
 
 private:
   int fd_;
