@@ -1,0 +1,266 @@
+EESchema Schematic File Version 4
+LIBS:pcb-cache
+EELAYER 26 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 46 46
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Isolator:ADuM1201AR U14
+U 1 1 5C22DB1C
+P 5750 3250
+F 0 "U14" H 5750 3717 50  0000 C CNN
+F 1 "ADuM1201AR" H 5750 3626 50  0000 C CNN
+F 2 "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" H 5750 2850 50  0001 C CIN
+F 3 "http://www.analog.com/media/en/technical-documentation/data-sheets/ADuM1200_1201.pdf" H 5750 3150 50  0001 C CNN
+	1    5750 3250
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5250 3050 5100 3050
+Wire Wire Line
+	5100 3050 5100 2300
+Wire Wire Line
+	5250 3450 5100 3450
+Wire Wire Line
+	5100 3450 5100 4150
+$Comp
+L Device:C C7
+U 1 1 5C231836
+P 4800 3350
+F 0 "C7" H 4915 3396 50  0000 L CNN
+F 1 "0.1uF" H 4915 3305 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 4838 3200 50  0001 C CNN
+F 3 "~" H 4800 3350 50  0001 C CNN
+	1    4800 3350
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4800 3500 4800 4150
+Wire Wire Line
+	4800 2300 5100 2300
+Wire Wire Line
+	4800 4150 5100 4150
+Wire Wire Line
+	6250 3450 6500 3450
+Wire Wire Line
+	6500 3450 6500 3750
+$Comp
+L power:GND #PWR0190
+U 1 1 5C2328CC
+P 6500 3950
+F 0 "#PWR0190" H 6500 3700 50  0001 C CNN
+F 1 "GND" H 6505 3777 50  0000 C CNN
+F 2 "" H 6500 3950 50  0001 C CNN
+F 3 "" H 6500 3950 50  0001 C CNN
+	1    6500 3950
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+5V #PWR0192
+U 1 1 5C2329A7
+P 6500 2750
+F 0 "#PWR0192" H 6500 2600 50  0001 C CNN
+F 1 "+5V" H 6515 2923 50  0000 C CNN
+F 2 "" H 6500 2750 50  0001 C CNN
+F 3 "" H 6500 2750 50  0001 C CNN
+	1    6500 2750
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6500 2750 6500 2850
+Wire Wire Line
+	6500 3050 6250 3050
+Wire Wire Line
+	6250 3150 6650 3150
+Wire Wire Line
+	6250 3350 6650 3350
+Text HLabel 6650 3350 2    50   Input ~ 0
+RX
+Text HLabel 6650 3150 2    50   Input ~ 0
+TX
+Wire Wire Line
+	6500 2850 7050 2850
+Wire Wire Line
+	7050 2850 7050 3300
+Connection ~ 6500 2850
+Wire Wire Line
+	6500 2850 6500 3050
+$Comp
+L Device:C C8
+U 1 1 5C234589
+P 7050 3450
+F 0 "C8" H 7165 3496 50  0000 L CNN
+F 1 "0.1uF" H 7165 3405 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 7088 3300 50  0001 C CNN
+F 3 "~" H 7050 3450 50  0001 C CNN
+	1    7050 3450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	7050 3600 7050 3750
+Wire Wire Line
+	7050 3750 6500 3750
+Connection ~ 6500 3750
+Wire Wire Line
+	6500 3750 6500 3950
+$Comp
+L Interface_USB:FT230XS U13
+U 1 1 5C23C6D3
+P 3700 3450
+F 0 "U13" H 3700 4328 50  0000 C CNN
+F 1 "FT230XS" H 3700 4237 50  0000 C CNN
+F 2 "Package_SO:SSOP-16_3.9x4.9mm_P0.635mm" H 4150 2800 50  0001 C CNN
+F 3 "http://www.ftdichip.com/Products/ICs/FT230X.html" H 3700 3450 50  0001 C CNN
+	1    3700 3450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4800 2300 4800 3200
+Wire Wire Line
+	4400 3050 5000 3050
+Wire Wire Line
+	5000 3050 5000 3150
+Wire Wire Line
+	5000 3150 5250 3150
+Wire Wire Line
+	5250 3350 5000 3350
+Wire Wire Line
+	5000 3350 5000 3200
+Wire Wire Line
+	4850 3200 4850 3150
+Wire Wire Line
+	4850 3200 5000 3200
+Wire Wire Line
+	4400 3150 4850 3150
+Wire Wire Line
+	3600 4600 3600 4150
+Wire Wire Line
+	3800 4150 3800 4600
+Wire Wire Line
+	3800 4600 3600 4600
+NoConn ~ 4400 3250
+NoConn ~ 4400 3350
+NoConn ~ 4400 3550
+NoConn ~ 4400 3650
+NoConn ~ 4400 3750
+NoConn ~ 4400 3850
+Wire Wire Line
+	3800 4600 4800 4600
+Wire Wire Line
+	4800 4600 4800 4150
+Connection ~ 3800 4600
+Connection ~ 4800 4150
+Wire Wire Line
+	3000 3050 2800 3050
+Wire Wire Line
+	2800 3050 2800 3650
+Wire Wire Line
+	2800 3650 3000 3650
+Wire Wire Line
+	2800 3050 2800 2500
+Wire Wire Line
+	2800 2500 3800 2500
+Wire Wire Line
+	3800 2500 3800 2750
+Connection ~ 2800 3050
+Wire Wire Line
+	3600 2300 4800 2300
+Wire Wire Line
+	3600 2300 3600 2750
+Connection ~ 4800 2300
+$Comp
+L Device:C C6
+U 1 1 5C242F77
+P 2800 4100
+F 0 "C6" H 2915 4146 50  0000 L CNN
+F 1 "100nF" H 2915 4055 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 2838 3950 50  0001 C CNN
+F 3 "~" H 2800 4100 50  0001 C CNN
+	1    2800 4100
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2800 3950 2800 3650
+Connection ~ 2800 3650
+Wire Wire Line
+	2800 4250 2800 4600
+Wire Wire Line
+	2800 4600 3600 4600
+Connection ~ 3600 4600
+$Comp
+L Connector:USB_B_Micro J10
+U 1 1 5C244256
+P 1150 3550
+F 0 "J10" H 1205 4017 50  0000 C CNN
+F 1 "USB_B_Micro" H 1205 3926 50  0000 C CNN
+F 2 "Connector_USB:USB_Micro-B_Wuerth_629105150521" H 1300 3500 50  0001 C CNN
+F 3 "~" H 1300 3500 50  0001 C CNN
+	1    1150 3550
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1050 3950 1050 4050
+Wire Wire Line
+	1050 4050 1150 4050
+Wire Wire Line
+	1150 4050 1150 3950
+Wire Wire Line
+	1150 4050 1750 4050
+Wire Wire Line
+	1950 4050 1950 4600
+Wire Wire Line
+	1950 4600 2800 4600
+Connection ~ 1150 4050
+Connection ~ 2800 4600
+NoConn ~ 1450 3750
+Wire Wire Line
+	1450 3650 2450 3650
+Wire Wire Line
+	2450 3650 2450 3350
+Wire Wire Line
+	2450 3350 3000 3350
+Wire Wire Line
+	1450 3550 2550 3550
+Wire Wire Line
+	2550 3550 2550 3450
+Wire Wire Line
+	2550 3450 3000 3450
+Wire Wire Line
+	1450 3350 1750 3350
+Wire Wire Line
+	1950 3350 1950 2500
+Wire Wire Line
+	1950 2500 2800 2500
+Connection ~ 2800 2500
+$Comp
+L Device:C C5
+U 1 1 5C2497A3
+P 1750 3850
+F 0 "C5" H 1865 3896 50  0000 L CNN
+F 1 "10uF" H 1865 3805 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 1788 3700 50  0001 C CNN
+F 3 "~" H 1750 3850 50  0001 C CNN
+	1    1750 3850
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1750 3700 1750 3350
+Connection ~ 1750 3350
+Wire Wire Line
+	1750 3350 1950 3350
+Wire Wire Line
+	1750 4000 1750 4050
+Connection ~ 1750 4050
+Wire Wire Line
+	1750 4050 1950 4050
+$EndSCHEMATC
