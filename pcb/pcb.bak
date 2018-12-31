@@ -629,11 +629,11 @@ Text Label 7700 4900 0    50   ~ 0
 ~RESET_OUT2
 Text Label 950  3850 0    50   ~ 0
 ~RESET_IN1
-Text Label 950  3950 0    50   ~ 0
+Text Label 950  4150 0    50   ~ 0
 ~RESET_IN2
 Text Label 950  4050 0    50   ~ 0
 ~RESET_OUT1
-Text Label 950  4150 0    50   ~ 0
+Text Label 950  3950 0    50   ~ 0
 ~RESET_OUT2
 Wire Wire Line
 	950  3450 1450 3450
