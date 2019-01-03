@@ -517,7 +517,7 @@ U 1 1 5C2D1997
 P 4900 1250
 F 0 "H1" H 5000 1296 50  0000 L CNN
 F 1 "MountingHole" H 5000 1205 50  0000 L CNN
-F 2 "MountingHole:MountingHole_3.2mm_M3" H 4900 1250 50  0001 C CNN
+F 2 "MountingHole:MountingHole_4.3mm_M4" H 4900 1250 50  0001 C CNN
 F 3 "~" H 4900 1250 50  0001 C CNN
 	1    4900 1250
 	1    0    0    -1  
@@ -528,7 +528,7 @@ U 1 1 5C2D19E7
 P 4900 1500
 F 0 "H2" H 5000 1546 50  0000 L CNN
 F 1 "MountingHole" H 5000 1455 50  0000 L CNN
-F 2 "MountingHole:MountingHole_3.2mm_M3" H 4900 1500 50  0001 C CNN
+F 2 "MountingHole:MountingHole_4.3mm_M4" H 4900 1500 50  0001 C CNN
 F 3 "~" H 4900 1500 50  0001 C CNN
 	1    4900 1500
 	1    0    0    -1  
@@ -539,7 +539,7 @@ U 1 1 5C2D1A0D
 P 4900 1750
 F 0 "H3" H 5000 1796 50  0000 L CNN
 F 1 "MountingHole" H 5000 1705 50  0000 L CNN
-F 2 "MountingHole:MountingHole_3.2mm_M3" H 4900 1750 50  0001 C CNN
+F 2 "MountingHole:MountingHole_4.3mm_M4" H 4900 1750 50  0001 C CNN
 F 3 "~" H 4900 1750 50  0001 C CNN
 	1    4900 1750
 	1    0    0    -1  
@@ -550,7 +550,7 @@ U 1 1 5C2D1A41
 P 4900 2000
 F 0 "H4" H 5000 2046 50  0000 L CNN
 F 1 "MountingHole" H 5000 1955 50  0000 L CNN
-F 2 "MountingHole:MountingHole_3.2mm_M3" H 4900 2000 50  0001 C CNN
+F 2 "MountingHole:MountingHole_4.3mm_M4" H 4900 2000 50  0001 C CNN
 F 3 "~" H 4900 2000 50  0001 C CNN
 	1    4900 2000
 	1    0    0    -1  
@@ -820,49 +820,21 @@ F 3 "" H 8400 2300 50  0001 C CNN
 	1    8400 2400
 	1    0    0    -1  
 $EndComp
-$Comp
-L Device:C_Small C1
-U 1 1 5C2A0087
-P 7650 2450
-F 0 "C1" H 7558 2404 50  0000 R CNN
-F 1 "22pF" H 7558 2495 50  0000 R CNN
-F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 7650 2450 50  0001 C CNN
-F 3 "~" H 7650 2450 50  0001 C CNN
-	1    7650 2450
-	-1   0    0    1   
-$EndComp
 Wire Wire Line
 	8000 2550 7650 2550
 Wire Wire Line
-	8000 2350 7650 2350
-$Comp
-L Device:C_Small C2
-U 1 1 5C2A4A63
-P 9300 2350
-F 0 "C2" H 9208 2304 50  0000 R CNN
-F 1 "22pF" H 9208 2395 50  0000 R CNN
-F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 9300 2350 50  0001 C CNN
-F 3 "~" H 9300 2350 50  0001 C CNN
-	1    9300 2350
-	-1   0    0    1   
-$EndComp
-Wire Wire Line
 	9300 2250 9150 2250
 Wire Wire Line
-	8800 2450 9300 2450
+	8800 2450 9150 2450
 Text Label 7200 2350 0    50   ~ 0
 GNDcomm
 Text Label 7200 2550 0    50   ~ 0
 Vcomm
 Connection ~ 7650 2550
-Connection ~ 7650 2350
-Wire Wire Line
-	7200 2350 7650 2350
 Wire Wire Line
 	7200 2550 7650 2550
 Wire Wire Line
 	9300 2250 9300 2150
-Connection ~ 9300 2250
 $Comp
 L power:+5V #PWR0103
 U 1 1 5C2B109E
@@ -887,7 +859,6 @@ F 3 "" H 9300 2550 50  0001 C CNN
 $EndComp
 Wire Wire Line
 	9300 2450 9300 2550
-Connection ~ 9300 2450
 Wire Wire Line
 	8800 2350 8850 2350
 Text Label 9100 2350 2    50   ~ 0
@@ -902,7 +873,7 @@ L Device:R R66
 U 1 1 5C2B8ED9
 P 8850 2000
 F 0 "R66" H 8920 2046 50  0000 L CNN
-F 1 "470" H 8920 1955 50  0000 L CNN
+F 1 "1k" H 8920 1955 50  0000 L CNN
 F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 8780 2000 50  0001 C CNN
 F 3 "~" H 8850 2000 50  0001 C CNN
 	1    8850 2000
@@ -936,7 +907,7 @@ L Device:R R65
 U 1 1 5C2C4D2C
 P 7650 2700
 F 0 "R65" H 7720 2746 50  0000 L CNN
-F 1 "470" H 7720 2655 50  0000 L CNN
+F 1 "1k" H 7720 2655 50  0000 L CNN
 F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 7580 2700 50  0001 C CNN
 F 3 "~" H 7650 2700 50  0001 C CNN
 	1    7650 2700
@@ -947,4 +918,34 @@ Wire Wire Line
 	7650 2850 7200 2850
 Text Label 7200 2850 0    50   ~ 0
 TXout
+Wire Wire Line
+	7200 2350 7650 2350
+$Comp
+L Device:C_Small C1
+U 1 1 5C2EE7BD
+P 7650 2450
+F 0 "C1" H 7742 2496 50  0000 L CNN
+F 1 "0.1uF" H 7742 2405 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 7650 2450 50  0001 C CNN
+F 3 "~" H 7650 2450 50  0001 C CNN
+	1    7650 2450
+	1    0    0    -1  
+$EndComp
+Connection ~ 7650 2350
+Wire Wire Line
+	7650 2350 8000 2350
+$Comp
+L Device:C_Small C2
+U 1 1 5C2EE82F
+P 9150 2350
+F 0 "C2" H 9242 2396 50  0000 L CNN
+F 1 "0.1uF" H 9242 2305 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm" H 9150 2350 50  0001 C CNN
+F 3 "~" H 9150 2350 50  0001 C CNN
+	1    9150 2350
+	1    0    0    -1  
+$EndComp
+Connection ~ 9150 2450
+Wire Wire Line
+	9150 2450 9300 2450
 $EndSCHEMATC
