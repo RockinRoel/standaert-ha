@@ -5,14 +5,14 @@ EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
 Sheet 3 45
-Title ""
+Title "Standaert Home Automation"
 Date ""
-Rev ""
+Rev "1"
 Comp ""
 Comment1 ""
 Comment2 ""
 Comment3 ""
-Comment4 ""
+Comment4 "Author: Roel Standaert"
 $EndDescr
 $Comp
 L dk_Optoisolators-Transistor-Photovoltaic-Output:LTV-847 U3

@@ -5,14 +5,14 @@ EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
 Sheet 16 45
-Title ""
+Title "Standaert Home Automation"
 Date ""
-Rev ""
+Rev "1"
 Comp ""
 Comment1 ""
 Comment2 ""
 Comment3 ""
-Comment4 ""
+Comment4 "Author: Roel Standaert"
 $EndDescr
 Text HLabel 2700 3600 0    50   Input ~ 0
 In
