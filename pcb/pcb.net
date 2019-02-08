@@ -1,7 +1,7 @@
 (export (version D)
   (design
     (source /home/roel/projects/standaert-ha/pcb/pcb.sch)
-    (date "Fri 08 Feb 2019 10:22:06 PM CET")
+    (date "Fri 08 Feb 2019 11:05:28 PM CET")
     (tool "Eeschema 5.0.2-4.fc29")
     (sheet (number 1) (name /) (tstamps /)
       (title_block
