@@ -13,7 +13,7 @@
 namespace StandaertHA {
 
 namespace {
-  constexpr const byte MAX_COMMANDS = 16;
+  constexpr const byte MAX_COMMANDS = 64;
 }
 
 /**
@@ -30,7 +30,7 @@ struct State {
    */
   struct Serial {
     uint8_t input_pos = 0;
-    uint8_t input_buffer[32];
+    uint8_t input_buffer[128];
   } serial;
 
   /**
@@ -214,43 +214,56 @@ void transmit(const ButtonEvent * const events) {
 }
 
 void receive(Command * const commands) {
-  int bytesToRead = min(Serial.available(),
-    sizeof(state.serial.input_buffer) - state.serial.input_pos - 1);
-  if (bytesToRead == 0)
-    return;
-  uint8_t * const buffer = state.serial.input_buffer + state.serial.input_pos;
-  size_t bytesRead = Serial.readBytesUntil(SLIP_END,
-                                           buffer,
-                                           bytesToRead);
-  state.serial.input_pos += bytesRead;
-  if (Serial.peek() != SLIP_END)
-    return;
-  state.serial.input_buffer[state.serial.input_pos] = Serial.read();
-  state.serial.input_pos++;
-  if (state.serial.input_pos < 5) { // SLIP_END + 1 byte data + CRC (2 bytes) + SLIP_END
-    state.serial.input_buffer[0] = SLIP_END;
-    state.serial.input_pos = 1;
-  } else {
-    byte decoded_buf[sizeof(state.serial.input_buffer)];
-    size_t decoded_size = slip_decode(state.serial.input_buffer,
-                                      state.serial.input_pos,
-                                      decoded_buf,
-                                      sizeof(decoded_buf));
-    uint16_t crc = 0;
-    for (size_t i = 0; i < decoded_size - 2; ++i) {
-      crc = _crc_xmodem_update(crc, decoded_buf[i]);
-    }
-    uint16_t received_crc = (static_cast<uint16_t>(decoded_buf[decoded_size - 2]) << 8 |
-                             decoded_buf[decoded_size - 1]);
-    if (crc == received_crc) {
-      for (size_t i = 0; i < decoded_size - 2 && i < MAX_COMMANDS; ++i) {
-        commands[i] = Command::fromRaw(decoded_buf[i]);
+  enum class RxState {
+    SCAN, // Looking for first SLIP_END
+    READ  // Reading message
+  };
+  static RxState s = RxState::SCAN;
+  
+  while (Serial.available() > 0) {
+    int b = Serial.read();
+    if (s == RxState::SCAN) {
+      if (b == SLIP_END) {
+        state.serial.input_buffer[0] = SLIP_END;
+        state.serial.input_pos = 1;
+        s = RxState::READ;
       }
     } else {
-      // discard!
+      if (state.serial.input_pos == sizeof(state.serial.input_buffer) - 1) {
+        // Buffer full, should not happen, reset
+        s = RxState::SCAN;
+        state.serial.input_pos = 0;
+        continue;
+      }
+      state.serial.input_buffer[state.serial.input_pos++] = b;
+      if (b == SLIP_END) {
+        if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
+          byte decoded_buf[sizeof(state.serial.input_buffer)];
+          size_t decoded_size = slip_decode(state.serial.input_buffer,
+                                            state.serial.input_pos,
+                                            decoded_buf,
+                                            sizeof(decoded_buf));
+          uint16_t crc = 0;
+          for (size_t i = 0; i < decoded_size - 2; ++i) {
+            crc = _crc_xmodem_update(crc, decoded_buf[i]);
+          }
+          uint16_t received_crc = (static_cast<uint16_t>(decoded_buf[decoded_size - 2]) << 8 |
+                                   decoded_buf[decoded_size - 1]);
+          if (crc == received_crc) {
+            for (size_t i = 0; i < decoded_size - 2 && i < MAX_COMMANDS; ++i) {
+              commands[i] = Command::fromRaw(decoded_buf[i]);
+            }
+          } else {
+            // discard!
+          }
+        } else {
+          // discard!
+        }
+        s = RxState::SCAN;
+        state.serial.input_pos = 0;
+        return;
+      }
     }
-    state.serial.input_buffer[0] = SLIP_END;
-    state.serial.input_pos = 1;
   }
 }
 
@@ -323,6 +336,9 @@ void loop() {
   }
   
   Command commands[MAX_COMMANDS];
+  for (int i = 0; i < MAX_COMMANDS; ++i) {
+    commands[i] = Command();
+  }
   receive(commands);
 
   for (int i = 0; i < MAX_COMMANDS; ++i) {
