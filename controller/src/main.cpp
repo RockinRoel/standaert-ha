@@ -1,16 +1,49 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "button_event.h"
+#include "command.h"
 #include "slip.h"
 #include "standaert_ha.h"
 
 namespace StandaertHA {
 
+/**
+ * Contains the state
+ */
 struct State {
+  /**
+   * Output state, as an array of 32 bits, 1 for HIGH, 0 for LOW
+   */
   uint32_t output = 0;
-  uint32_t committedState = 0xFFFFFFFF;
-  uint32_t lastState = 0xFFFFFFFF;
-  unsigned long stateTimestamps[32];
+
+  /**
+   * Debounced inputs
+   */
+  struct DebouncedInput {
+    /**
+     * Current committed state (after debouncing)
+     * 
+     * Array of 32 bits, 1 for HIGH, 0 for LOW
+     * 
+     * Inputs are pulled low when button press starts,
+     * so 0 means the button is pressed, 1 means the
+     * button is not pressed.
+     */
+    uint32_t committed = 0xFFFFFFFF;
+
+    /**
+     * Last measured state
+     * 
+     * Array of 32 bits, 1 for HIGH, 0 for LOW
+     */
+    uint32_t last      = 0xFFFFFFFF;
+
+    /**
+     * Timestamp when the last state was first measured
+     */
+    unsigned long timestamps[32];
+  } input;
 } state;
 
 enum class Mode : byte {
@@ -22,53 +55,9 @@ Mode mode() {
   return digitalRead(MODE_PIN) == HIGH ? Mode::DEFAULT_PROGRAM : Mode::SERIAL_ONLY;
 }
 
-class ButtonEvent {
-public:
-  enum class Type {
-    PressStart,
-    PressEnd
-  };
-
-  constexpr ButtonEvent()
-    : data_(0)
-  { }
-
-  constexpr ButtonEvent(byte button,
-                        Type type)
-    : data_((type == Type::PressStart ? B00000000 : B10000000) | (button & B00111111) | B01000000)
-  { }
-
-  constexpr ButtonEvent(const ButtonEvent &e)
-    : data_(e.data_)
-  { }
-
-  ButtonEvent &operator=(const ButtonEvent &e)
-  {
-    data_ = e.data_;
-
-    return *this;
-  }
-  
-  constexpr bool valid() const {
-    return data_ & B01000000;
-  }
-
-  constexpr Type type() const {
-    return ((data_ & B10000000) ? Type::PressEnd : Type::PressStart);
-  }
-
-  constexpr byte button() const {
-    return data_ & B00111111;
-  }
-
-  constexpr byte raw() const {
-    return data_;
-  }
-
-private:
-  byte data_;
-};
-
+/**
+ * Reset all IO expanders (e.g. on bootup)
+ */
 void toggleResets() {
   digitalWrite(RST_IN1_PIN, LOW);
   digitalWrite(RST_IN2_PIN, LOW);
@@ -87,12 +76,14 @@ void toggleResets() {
 
 void configureInputs() {
   for (auto inAddr = IN1_ADDR; inAddr <= IN2_ADDR; ++inAddr) {
+    // Set all pins as input
     Wire.beginTransmission(inAddr);
     Wire.write(MCP23017_IODIRA);
     Wire.write(B11111111);
     Wire.write(B11111111);
     Wire.endTransmission();
 
+    // Enable pullup on all pins
     Wire.beginTransmission(inAddr);
     Wire.write(MCP23017_GPPUA);
     Wire.write(B11111111);
@@ -166,22 +157,22 @@ void getButtonEvents(ButtonEvent * const events) {
 
   for (byte i = 0; i < 32; ++i) {
     const int cur_b = getBit(inputs, i);
-    const int prev_b = getBit(state.lastState, i);
-    const int com_b = getBit(state.committedState, i);
+    const int prev_b = getBit(state.input.last, i);
+    const int com_b = getBit(state.input.committed, i);
     if (cur_b != com_b &&
         cur_b == prev_b) {
-      if (now - state.stateTimestamps[i] >= DEBOUNCE_TIME_MILLIS) {
-        setBit(state.committedState, i, cur_b);
+      if (now - state.input.timestamps[i] >= DEBOUNCE_TIME_MILLIS) {
+        setBit(state.input.committed, i, cur_b);
         *nextEvent = ButtonEvent(i, cur_b == LOW ? ButtonEvent::Type::PressStart : ButtonEvent::Type::PressEnd);
         ++nextEvent;
       }
     } else if (cur_b != com_b &&
                cur_b != prev_b) {
-      state.stateTimestamps[i] = now;
+      state.input.timestamps[i] = now;
     }
   }
 
-  state.lastState = inputs;
+  state.input.last = inputs;
 }
 
 constexpr const uint32_t kitchenTableLight = 31;
@@ -291,22 +282,35 @@ void setup() {
   configureInputs();
   configureOutputs();
 
-  state.committedState = readInputs();
-  state.lastState = readInputs();
+  const uint32_t inputs = readInputs();
+  state.input.committed = inputs;
+  state.input.last = inputs;
   unsigned long t = millis();
   for (byte i = 0; i < 32; ++i) {
-    state.stateTimestamps[i] = t;
+    state.input.timestamps[i] = t;
   }
 }
 
+/**
+ * Loop:
+ *  - read inputs, get events
+ *  - if MODE is 1:
+ *    - process events
+ *    - do postprocessing (e.g. ORring certain outputs)
+ *  - transmit events and current output state over serial
+ *  - receive and process commands over serial, until none are left
+ *  - if MODE is 1:
+ *    - do postprocessing (e.g. ORring certain outputs)
+ */
 void loop() {
   using namespace StandaertHA;
+
+  const Mode m = mode();
   const uint32_t output_before = state.output;
 
   ButtonEvent events[32];
   getButtonEvents(events);
 
-  const Mode m = mode();
   if (m == Mode::DEFAULT_PROGRAM) {
     for (ButtonEvent *ev = &events[0]; ev->valid(); ++ev) {
       processEvent(*ev);
@@ -314,14 +318,12 @@ void loop() {
     postprocess();
   }
 
-/*
   if (events[0].valid() ||
       output_before != state.output) {
     transmit(events);
   }
   
   receive();
-*/
 
   if (m == Mode::DEFAULT_PROGRAM) {
     postprocess();
