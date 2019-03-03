@@ -4,7 +4,6 @@ namespace StandaertHA {
 
 namespace {
 
-constexpr const uint8_t SLIP_END = 0xC0;
 constexpr const uint8_t SLIP_ESC = 0xDB;
 constexpr const uint8_t SLIP_ESC_END = 0xDC;
 constexpr const uint8_t SLIP_ESC_ESC = 0xDD;
@@ -41,11 +40,7 @@ size_t slip_decode(const uint8_t * const in_buf,
                    uint8_t * const out_buf,
                    const size_t out_size)
 {
-  size_t in_pos = 0;
-  while (in_buf[in_pos] != SLIP_END) {
-      ++in_pos;
-  }
-  ++in_pos;
+  size_t in_pos = 1;
   size_t pos = 0;
   while (in_pos < in_size &&
          in_buf[in_pos] != SLIP_END) {
@@ -58,10 +53,10 @@ size_t slip_decode(const uint8_t * const in_buf,
         } else {
             // TODO: error?
         }
-        ++in_pos;
     } else {
         out_buf[pos++] = in_buf[in_pos];
     }
+    ++in_pos;
   }
   return pos;
 }

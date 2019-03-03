@@ -7,9 +7,14 @@
 #include "config.h"
 #include "slip.h"
 #include "standaert_ha.h"
-#include "util.h"
+
+#include <util/crc16.h>
 
 namespace StandaertHA {
+
+namespace {
+  constexpr const byte MAX_COMMANDS = 16;
+}
 
 /**
  * Contains the state
@@ -19,6 +24,14 @@ struct State {
    * Output state, as an array of 32 bits, 1 for HIGH, 0 for LOW
    */
   uint32_t output = 0;
+
+  /**
+   * Serial state (input buffer)
+   */
+  struct Serial {
+    uint8_t input_pos = 0;
+    uint8_t input_buffer[32];
+  } serial;
 
   /**
    * Debounced inputs
@@ -47,6 +60,11 @@ struct State {
      */
     unsigned long timestamps[32];
   } input;
+
+  /**
+   * Need to send full state on next loop (refresh)
+   */
+  bool refresh = false;
 } state;
 
 enum class Mode : byte {
@@ -170,7 +188,7 @@ void processEvent(const ButtonEvent &event) {
 }
 
 void transmit(const ButtonEvent * const events) {
-  byte buf[36];
+  byte buf[38];
   byte pos = 0;
   for (byte i = 0; i < 32; ++i) {
     buf[pos] = events[i].raw();
@@ -181,14 +199,59 @@ void transmit(const ButtonEvent * const events) {
   buf[pos++] = (state.output >> 8) & 0xFF;
   buf[pos++] = state.output & 0xFF;
 
-  byte encoded_buf[128];
-  size_t size = slip_encode(buf, pos, encoded_buf, 128);
+  uint16_t crc = 0;
+  for (byte i = 0; i < pos; ++i) {
+    crc = _crc_xmodem_update(crc, buf[i]);
+  }
+
+  buf[pos++] = (crc >> 8) & 0xFF;
+  buf[pos++] = crc & 0xFF;
+
+  byte encoded_buf[sizeof(buf) * 2 + 2];
+  size_t size = slip_encode(buf, pos, encoded_buf, sizeof(encoded_buf));
 
   Serial.write(encoded_buf, size);
 }
 
-void receive() {
-
+void receive(Command * const commands) {
+  int bytesToRead = min(Serial.available(),
+    sizeof(state.serial.input_buffer) - state.serial.input_pos - 1);
+  if (bytesToRead == 0)
+    return;
+  uint8_t * const buffer = state.serial.input_buffer + state.serial.input_pos;
+  size_t bytesRead = Serial.readBytesUntil(SLIP_END,
+                                           buffer,
+                                           bytesToRead);
+  state.serial.input_pos += bytesRead;
+  if (Serial.peek() != SLIP_END)
+    return;
+  state.serial.input_buffer[state.serial.input_pos] = Serial.read();
+  state.serial.input_pos++;
+  if (state.serial.input_pos < 5) { // SLIP_END + 1 byte data + CRC (2 bytes) + SLIP_END
+    state.serial.input_buffer[0] = SLIP_END;
+    state.serial.input_pos = 1;
+  } else {
+    byte decoded_buf[sizeof(state.serial.input_buffer)];
+    size_t decoded_size = slip_decode(state.serial.input_buffer,
+                                      state.serial.input_pos,
+                                      decoded_buf,
+                                      sizeof(decoded_buf));
+    uint16_t crc = 0;
+    for (size_t i = 0; i < decoded_size - 2; ++i) {
+      crc = _crc_xmodem_update(crc, decoded_buf[i]);
+    }
+    uint16_t received_crc = (static_cast<uint16_t>(decoded_buf[decoded_size - 2]) << 8 |
+                             decoded_buf[decoded_size - 1]);
+    if (crc == received_crc) {
+      for (size_t i = 0; i < decoded_size - 2 && i < MAX_COMMANDS; ++i) {
+        commands[i] = Command::fromRaw(decoded_buf[i]);
+      }
+    } else {
+      // discard!
+    }
+    state.serial.input_buffer[0] = SLIP_END;
+    state.serial.input_pos = 1;
+  }
 }
 
 }
@@ -252,12 +315,23 @@ void loop() {
     postprocess();
   }
 
-  if (events[0].valid() ||
+  if (state.refresh ||
+      events[0].valid() ||
       output_before != state.output) {
     transmit(events);
+    state.refresh = false;
   }
   
-  receive();
+  Command commands[MAX_COMMANDS];
+  receive(commands);
+
+  for (int i = 0; i < MAX_COMMANDS; ++i) {
+    if (commands[i].type() == Command::Type::Refresh) {
+      state.refresh = true;
+    } else {
+      state.output = commands[i].apply(state.output);
+    }
+  }
 
   if (m == Mode::DEFAULT_PROGRAM) {
     postprocess();

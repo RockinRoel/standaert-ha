@@ -6,6 +6,8 @@
 #include <Arduino.h>
 #endif // !STANDAERTHA_NATIVE
 
+#include "util.h"
+
 namespace StandaertHA {
 
 /**
@@ -20,6 +22,7 @@ class Command {
 public:
   enum class Type : uint8_t {
     None   = 0x00,
+    Refresh = 0x20,
     Toggle = 0x40,
     Off    = 0x80,
     On     = 0xC0
@@ -35,7 +38,7 @@ public:
   { }
 
   constexpr Type type() const {
-    return static_cast<Type>(data_ & 0xC0);
+    return static_cast<Type>(data_ & 0xE0);
   }
 
   constexpr uint8_t output() const {
@@ -48,6 +51,18 @@ public:
 
   constexpr static Command fromRaw(uint8_t data) {
     return Command(data);
+  }
+
+  constexpr uint32_t apply(uint32_t before) const {
+    if (type() == Type::Toggle) {
+      return before ^ (static_cast<uint32_t>(1) << output());
+    } else if (type() == Type::Off) {
+      return before & ~(static_cast<uint32_t>(1) << output());
+    } else if (type() == Type::On) {
+      return before | (static_cast<uint32_t>(1) << output());
+    } else {
+      return before;
+    }
   }
 
 private:
