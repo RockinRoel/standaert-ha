@@ -1,0 +1,7 @@
+{
+    "terminal.integrated.env.linux": {
+        "PATH": "/home/roel/.platformio/penv/bin:/home/roel/.platformio/penv:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl",
+        "PLATFORMIO_CALLER": "vscode"
+    },
+    "C_Cpp.intelliSenseEngineFallback": "Disabled"
+}
