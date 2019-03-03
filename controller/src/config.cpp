@@ -39,8 +39,8 @@ inline BUGGED_CONSTEXPR Config createConfig()
   result.on(ButtonEvent::Type::PressStart, 27, Command::Type::Toggle, 4);
   result.on(ButtonEvent::Type::PressStart, 28, Command::Type::Toggle, 3);
   result.on(ButtonEvent::Type::PressStart, 29, Command::Type::Toggle, 2);
-  result.on(ButtonEvent::Type::PressStart, 30, Command::Type::Toggle, 0);
-  result.on(ButtonEvent::Type::PressStart, 31, Command::Type::Toggle, 1);
+  result.on(ButtonEvent::Type::PressStart, 30, Command::Type::Toggle, 1);
+  result.on(ButtonEvent::Type::PressStart, 31, Command::Type::Toggle, 0);
   return result;
 }
 
