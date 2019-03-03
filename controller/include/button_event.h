@@ -1,6 +1,10 @@
 #pragma once
 
+#if STANDAERTHA_NATIVE
+#include <cstdint>
+#else // !STANDAERTHA_NATIVE
 #include <Arduino.h>
+#endif // !STANDAERTHA_NATIVE
 
 namespace StandaertHA {
 
@@ -34,24 +38,6 @@ public:
             (button & 0x1F) | // button id
             0x40) // valid
   { }
-
-  constexpr ButtonEvent(const ButtonEvent &e) = default;
-  constexpr ButtonEvent &operator=(const ButtonEvent &e) = default;
-
-  ButtonEvent(ButtonEvent &&e)
-    : data_(e.data_)
-  {
-    e.data_ = 0;
-  }
-
-  ButtonEvent &operator=(ButtonEvent &&e)
-  {
-    data_ = e.data_;
-    if (this != &e)
-      e.data_ = 0;
-    
-    return *this;
-  }
   
   constexpr bool valid() const {
     return data_ & 0x40;

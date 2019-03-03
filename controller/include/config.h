@@ -1,6 +1,10 @@
 #pragma once
 
+#if STANDAERTHA_NATIVE
+#include <cstdint>
+#else // !STANDAERTHA_NATIVE
 #include <Arduino.h>
+#endif // !STANDAERTHA_NATIVE
 
 #include "button_event.h"
 #include "command.h"
@@ -23,10 +27,6 @@ public:
      : pressStart_(CommandSet<32>()),
        pressEnd_(CommandSet<32>())
    { }
-   constexpr Config(const Config &) = default;
-   constexpr Config &operator=(const Config &) = default;
-   constexpr Config(Config &&) = default;
-   constexpr Config &operator=(Config &&) = default;
 
    constexpr Config &on(const ButtonEvent::Type eventType,
                         const uint8_t button,
@@ -65,11 +65,6 @@ private:
           off_{},
           toggle_{}
       { }
-
-      constexpr CommandSet(const CommandSet &) = default;
-      constexpr CommandSet &operator=(const CommandSet &) = default;
-      constexpr CommandSet(CommandSet &&) = default;
-      constexpr CommandSet& operator=(CommandSet &&) = default;
 
       constexpr void addCommand(const uint8_t button,
                                 const Command::Type commandType,

@@ -1,3 +1,4 @@
+#if !STANDAERTHA_NATIVE
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -266,3 +267,6 @@ void loop() {
     writeOutputs(state.output);
   }
 }
+#else
+int main() { }
+#endif

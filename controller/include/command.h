@@ -1,6 +1,10 @@
 #pragma once
 
+#if STANDAERTHA_NATIVE
+#include <cstdint>
+#else // !STANDAERTHA_NATIVE
 #include <Arduino.h>
+#endif // !STANDAERTHA_NATIVE
 
 namespace StandaertHA {
 
@@ -29,24 +33,6 @@ public:
     : data_(static_cast<uint8_t>(type) | // type
             (output & 0x1F)) // output
   { }
-
-  constexpr Command(const Command &) = default;
-  Command &operator=(const Command &) = default;
-
-  Command(Command &&c)
-    : data_(c.data_)
-  {
-    c.data_ = 0;
-  }
-
-  Command &operator=(Command &&c)
-  {
-    data_ = c.data_;
-    if (this != &c)
-      c.data_ = 0;
-    
-    return *this;
-  }
 
   constexpr Type type() const {
     return static_cast<Type>(data_ & 0xC0);
