@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Arduino.h"
+#include <Arduino.h>
 
 namespace StandaertHA {
 
@@ -20,24 +20,23 @@ namespace StandaertHA {
  */
 class ButtonEvent {
 public:
-  enum class Type : byte {
-    PressStart = B00000000,
-    PressEnd   = B10000000
+  enum class Type : uint8_t {
+    PressStart = 0x00,
+    PressEnd   = 0x80
   };
 
   constexpr ButtonEvent()
     : data_(0)
   { }
 
-  constexpr explicit ButtonEvent(byte button,
-                        Type type)
-    : data_(static_cast<byte>(type) | // type
-            (button & B00011111) | // button id
-            B01000000) // valid
+  constexpr explicit ButtonEvent(uint8_t button, Type type)
+    : data_(static_cast<uint8_t>(type) | // type
+            (button & 0x1F) | // button id
+            0x40) // valid
   { }
 
   constexpr ButtonEvent(const ButtonEvent &e) = default;
-  ButtonEvent &operator=(const ButtonEvent &e) = default;
+  constexpr ButtonEvent &operator=(const ButtonEvent &e) = default;
 
   ButtonEvent(ButtonEvent &&e)
     : data_(e.data_)
@@ -55,31 +54,31 @@ public:
   }
   
   constexpr bool valid() const {
-    return data_ & B01000000;
+    return data_ & 0x40;
   }
 
   constexpr Type type() const {
-    return static_cast<Type>(data_ & B10000000);
+    return static_cast<Type>(data_ & 0x80);
   }
 
-  constexpr byte button() const {
-    return data_ & B00011111;
+  constexpr uint8_t button() const {
+    return data_ & 0x1F;
   }
 
-  constexpr byte raw() const {
+  constexpr uint8_t raw() const {
     return data_;
   }
 
-  static constexpr ButtonEvent fromRaw(byte data) {
+  static constexpr ButtonEvent fromRaw(uint8_t data) {
     return ButtonEvent(data);
   }
 
 private:
-  constexpr explicit ButtonEvent(byte data)
+  constexpr explicit ButtonEvent(uint8_t data)
     : data_(data)
   { }
 
-  byte data_;
+  uint8_t data_;
 };
 
 } // StandaertHA

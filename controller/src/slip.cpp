@@ -4,23 +4,23 @@ namespace StandaertHA {
 
 namespace {
 
-constexpr const byte SLIP_END = 0xC0;
-constexpr const byte SLIP_ESC = 0xDB;
-constexpr const byte SLIP_ESC_END = 0xDC;
-constexpr const byte SLIP_ESC_ESC = 0xDD;
+constexpr const uint8_t SLIP_END = 0xC0;
+constexpr const uint8_t SLIP_ESC = 0xDB;
+constexpr const uint8_t SLIP_ESC_END = 0xDC;
+constexpr const uint8_t SLIP_ESC_ESC = 0xDD;
 
 }
 
-size_t slip_encode(const byte * const in_buf,
+size_t slip_encode(const uint8_t * const in_buf,
                    const size_t in_size,
-                   byte * const out_buf,
+                   uint8_t * const out_buf,
                    const size_t out_size)
 {
   size_t pos = 0;
   out_buf[pos++] = SLIP_END;
 
   for (size_t in_pos = 0; in_pos < in_size; ++in_pos) {
-    const byte b = in_buf[in_pos];
+    const uint8_t b = in_buf[in_pos];
     if (b == SLIP_END) {
       out_buf[pos++] = SLIP_ESC;
       out_buf[pos++] = SLIP_ESC_END;
@@ -36,9 +36,9 @@ size_t slip_encode(const byte * const in_buf,
   return pos;
 }
 
-size_t slip_decode(const byte * const in_buf,
+size_t slip_decode(const uint8_t * const in_buf,
                    const size_t in_size,
-                   byte * const out_buf,
+                   uint8_t * const out_buf,
                    const size_t out_size)
 {
   size_t in_pos = 0;

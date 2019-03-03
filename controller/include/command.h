@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Arduino.h"
+#include <Arduino.h>
 
 namespace StandaertHA {
 
@@ -14,20 +14,20 @@ namespace StandaertHA {
  */
 class Command {
 public:
-  enum class Type : byte {
-    None   = B00000000,
-    Toggle = B01000000,
-    Off    = B10000000,
-    On     = B11000000
+  enum class Type : uint8_t {
+    None   = 0x00,
+    Toggle = 0x40,
+    Off    = 0x80,
+    On     = 0xC0
   };
   
   constexpr Command()
     : data_(0)
   { }
 
-  constexpr explicit Command(Type type, byte output)
-    : data_(static_cast<byte>(type) | // type
-            (output & B00011111)) // output
+  constexpr explicit Command(Type type, uint8_t output)
+    : data_(static_cast<uint8_t>(type) | // type
+            (output & 0x1F)) // output
   { }
 
   constexpr Command(const Command &) = default;
@@ -49,27 +49,27 @@ public:
   }
 
   constexpr Type type() const {
-    return static_cast<Type>(data_ & B11000000);
+    return static_cast<Type>(data_ & 0xC0);
   }
 
-  constexpr byte output() const {
-    return data_ & B00011111;
+  constexpr uint8_t output() const {
+    return data_ & 0x1F;
   }
 
-  constexpr byte raw() const {
+  constexpr uint8_t raw() const {
     return data_;
   }
 
-  constexpr static Command fromRaw(byte data) {
+  constexpr static Command fromRaw(uint8_t data) {
     return Command(data);
   }
 
 private:
-  constexpr explicit Command(byte data)
+  constexpr explicit Command(uint8_t data)
     : data_(data)
   { }
 
-  byte data_;
+  uint8_t data_;
 };
 
 } // StandaertHA

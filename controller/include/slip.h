@@ -4,9 +4,9 @@
 
 namespace StandaertHA {
 
-size_t slip_encode(const byte * const in_buf,
+size_t slip_encode(const uint8_t * const in_buf,
                    const size_t in_size,
-                   byte * const out_buf,
+                   uint8_t * const out_buf,
                    const size_t out_size);
 
 }

@@ -3,8 +3,10 @@
 
 #include "button_event.h"
 #include "command.h"
+#include "config.h"
 #include "slip.h"
 #include "standaert_ha.h"
+#include "util.h"
 
 namespace StandaertHA {
 
@@ -137,19 +139,6 @@ void writeOutputs(uint32_t state) {
   }
 }
 
-constexpr inline int getBit(const uint32_t i, const byte bit) {
-  return ((i >> bit) & 1) ? HIGH : LOW;
-}
-
-void setBit(uint32_t &i, const byte bit, int v) {
-  uint32_t mask = ((uint32_t)1) << bit;
-  if (v == HIGH) {
-    i = i | mask;
-  } else {
-    i = i & ~mask;
-  }
-}
-
 void getButtonEvents(ButtonEvent * const events) {
   const uint32_t inputs = readInputs();
   ButtonEvent *nextEvent = events;
@@ -175,67 +164,8 @@ void getButtonEvents(ButtonEvent * const events) {
   state.input.last = inputs;
 }
 
-constexpr const uint32_t kitchenTableLight = 31;
-constexpr const uint32_t blablaLight = 30;
-constexpr const uint32_t thirdLight = 29;
-
-constexpr uint32_t mask(const byte b)
-{
-  return ((uint32_t)1) << b;
-}
-
-constexpr const uint32_t pressStartToggleMatrix[32] =
-  {
-    0x80000000,
-    0x40000000,
-    0x20000000,
-    0x10000000,
-    0x08000000,
-    0x04000000,
-    0x02000000,
-    0x01000000,
-    0x00800000,
-    0x00400000,
-    0x00200000,
-    0x00100000,
-    0x00080000,
-    0x00040000,
-    0x00020000,
-    0x00010000,
-    0x00008000,
-    0x00004000,
-    0x00002000,
-    0x00001000,
-    0x00000800,
-    0x00000400,
-    0x00000200,
-    0x00000100,
-    0x00000080,
-    0x00000040,
-    0x00000020,
-    0x00000010,
-    0x00000008,
-    0x00000004,
-    0x00000002,
-    0x00000001
-  };
-
-void processEvent(ButtonEvent &event) {
-  if (event.type() == ButtonEvent::Type::PressStart) {
-    uint32_t toggle = pressStartToggleMatrix[event.button()];
-    state.output = state.output ^ toggle;
-  }
-}
-
-void postprocess() {
-  /*
-  if (getBit(state.output, kitchenTableLight) == HIGH ||
-      getBit(state.output, blablaLight) == HIGH) {
-    setBit(state.output, thirdLight, HIGH);
-  } else {
-    setBit(state.output, thirdLight, LOW);
-  }
-  */
+void processEvent(const ButtonEvent &event) {
+  state.output = config.apply(state.output, event);
 }
 
 void transmit(const ButtonEvent * const events) {
@@ -308,7 +238,10 @@ void loop() {
   const Mode m = mode();
   const uint32_t output_before = state.output;
 
-  ButtonEvent events[32];
+  ButtonEvent events[33];
+  for (int i = 0; i < 33; ++i) {
+    events[i] = ButtonEvent();
+  }
   getButtonEvents(events);
 
   if (m == Mode::DEFAULT_PROGRAM) {
