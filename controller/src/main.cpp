@@ -64,7 +64,7 @@ struct State {
   /**
    * Need to send full state on next loop (refresh)
    */
-  bool refresh = false;
+  bool refresh = true;
 } state;
 
 enum class Mode : byte {
@@ -341,6 +341,7 @@ void loop() {
   }
   receive(commands);
 
+  const uint32_t output_before_commands = state.output;
   for (int i = 0; i < MAX_COMMANDS; ++i) {
     if (commands[i].type() == Command::Type::Refresh) {
       state.refresh = true;
@@ -351,6 +352,10 @@ void loop() {
 
   if (m == Mode::DEFAULT_PROGRAM) {
     postprocess();
+  }
+
+  if (output_before_commands != state.output) {
+    state.refresh = true;
   }
 
   if (output_before != state.output) {
