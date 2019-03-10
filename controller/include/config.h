@@ -106,6 +106,6 @@ private:
 };
 
 extern const Config config;
-extern void postprocess();
+extern void postprocess(uint32_t &output);
 
 } // StandaertHA

@@ -325,7 +325,7 @@ void loop() {
     for (ButtonEvent *ev = &events[0]; ev->valid(); ++ev) {
       processEvent(*ev);
     }
-    postprocess();
+    postprocess(state.output);
   }
 
   if (state.refresh ||
@@ -351,7 +351,7 @@ void loop() {
   }
 
   if (m == Mode::DEFAULT_PROGRAM) {
-    postprocess();
+    postprocess(state.output);
   }
 
   if (output_before_commands != state.output) {
