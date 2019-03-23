@@ -12,38 +12,41 @@ inline BUGGED_CONSTEXPR Config createConfig()
   const auto Toggle = Command::Type::Toggle;
 
   Config result;
-  result.on(PressStart, 0, Toggle, 31);
-  result.on(PressStart, 1, Toggle, 30);
-  result.on(PressStart, 2, Toggle, 29);
-  result.on(PressStart, 3, Toggle, 28);
-  result.on(PressStart, 4, Toggle, 27);
-  result.on(PressStart, 5, Toggle, 26);
-  result.on(PressStart, 6, Toggle, 25);
-  result.on(PressStart, 7, Toggle, 24);
-  result.on(PressStart, 8, Toggle, 23);
-  result.on(PressStart, 9, Toggle, 22);
-  result.on(PressStart, 10, Toggle, 21);
-  result.on(PressStart, 11, Toggle, 20);
-  result.on(PressStart, 12, Toggle, 19);
-  result.on(PressStart, 13, Toggle, 18);
-  result.on(PressStart, 14, Toggle, 17);
-  result.on(PressStart, 15, Toggle, 16);
-  result.on(PressStart, 16, Toggle, 15);
-  result.on(PressStart, 17, Toggle, 14);
-  result.on(PressStart, 18, Toggle, 13);
-  result.on(PressStart, 19, Toggle, 12);
-  result.on(PressStart, 20, Toggle, 11);
-  result.on(PressStart, 21, Toggle, 10);
-  result.on(PressStart, 22, Toggle, 9);
-  result.on(PressStart, 23, Toggle, 8);
-  result.on(PressStart, 24, Toggle, 7);
-  result.on(PressStart, 25, Toggle, 6);
-  result.on(PressStart, 26, Toggle, 5);
-  result.on(PressStart, 27, Toggle, 4);
-  result.on(PressStart, 28, Toggle, 3);
-  result.on(PressStart, 29, Toggle, 2);
-  result.on(PressStart, 30, Toggle, 1);
-  result.on(PressStart, 31, Toggle, 0);
+  result.on(PressStart, 0, Toggle, 4);
+  result.on(PressStart, 1, Toggle, 3);
+  result.on(PressStart, 2, Toggle, 24);
+  result.on(PressStart, 3, Toggle, 2);
+  result.on(PressStart, 4, Toggle, 0);
+  result.on(PressStart, 5, Toggle, 17);
+  result.on(PressStart, 6, Toggle, 20);
+  result.on(PressStart, 7, Toggle, 13);
+  result.on(PressStart, 8, Toggle, 16);
+  result.on(PressStart, 9, Toggle, 6);
+  result.on(PressStart, 11, Toggle, 25);
+  result.on(PressStart, 11, Toggle, 5);
+  result.on(PressStart, 12, Toggle, 7);  
+  result.on(PressStart, 13, Toggle, 5);
+  result.on(PressStart, 13, Toggle, 25);
+  result.on(PressStart, 14, Toggle, 31);
+  result.on(PressStart, 15, Toggle, 20);
+  result.on(PressStart, 16, Toggle, 5);
+  result.on(PressStart, 16, Toggle, 25);  
+  result.on(PressStart, 17, Toggle, 28);
+  result.on(PressStart, 17, Toggle, 29);  
+  result.on(PressStart, 18, Toggle, 26);
+  result.on(PressStart, 19, Toggle, 11);
+  result.on(PressStart, 20, Toggle, 30);
+  result.on(PressStart, 21, Toggle, 8);
+  result.on(PressStart, 22, Toggle, 18);
+  result.on(PressStart, 23, Toggle, 14);
+  result.on(PressStart, 24, Toggle, 15);
+  result.on(PressStart, 25, Toggle, 15);
+  result.on(PressStart, 26, Toggle, 12);
+  result.on(PressStart, 27, Toggle, 27);
+  result.on(PressStart, 28, Toggle, 12);
+  result.on(PressStart, 29, Toggle, 10);
+  result.on(PressStart, 30, Toggle, 15);
+  result.on(PressStart, 31, Toggle, 23);
   return result;
 }
 
@@ -52,11 +55,11 @@ inline BUGGED_CONSTEXPR Config createConfig()
 const Config config = createConfig();
 
 void postprocess(uint32_t &output) {
-  if (getBit(output, 0) == HIGH ||
-      getBit(output, 1) == HIGH) {
-    setBit(output, 2, HIGH);
+  if (getBit(output, 20) == HIGH ||
+      getBit(output, 5) == HIGH) {
+    setBit(output, 22, HIGH);
   } else {
-    setBit(output, 2, LOW);
+    setBit(output, 22, LOW);
   }
 }
 
