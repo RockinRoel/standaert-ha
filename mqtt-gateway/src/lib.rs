@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+
 pub const SLIP_END: u8 = 0o300;
 pub const SLIP_ESC: u8 = 0o333;
 pub const SLIP_ESC_END: u8 = 0o334;
@@ -5,6 +8,41 @@ pub const SLIP_ESC_ESC: u8 = 0o335;
 
 #[derive(Debug, Clone)]
 pub struct SlipError;
+
+impl Display for SlipError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "SLIP decoding error")
+    }
+}
+
+impl Error for SlipError {
+    fn description(&self) -> &str {
+        "SLIP decoding error"
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CRCError;
+
+impl Display for CRCError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "CRC error")
+    }
+}
+
+impl Error for CRCError {
+    fn description(&self) -> &str {
+        "CRC error"
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+}
 
 pub fn verify_crc16(buf: &[u8]) -> bool {
     use crc16::*;
@@ -56,13 +94,13 @@ pub fn slip_decode(buf: &[u8]) -> Result<Vec<u8>, SlipError> {
             match *byte {
                 SLIP_ESC_END => result.push(SLIP_END),
                 SLIP_ESC_ESC => result.push(SLIP_ESC),
-                _ => return Err(SlipError {}),
+                _ => return Err(SlipError),
             }
             esc = false;
         } else {
             match *byte {
                 SLIP_ESC => esc = true,
-                SLIP_END => return Err(SlipError {}),
+                SLIP_END => return Err(SlipError),
                 b => result.push(b),
             }
         }
@@ -115,24 +153,24 @@ where
                     (SLIP_END, PackageInputStreamMode::Read) => {
                         self.buf.push(b);
                         let result = slip_decode(&self.buf);
-                        if result.is_err() {
-                            return Some(Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "SLIP decode error",
-                            )));
-                        }
-                        let mut result = result.unwrap();
-                        self.buf.clear();
-                        self.mode = PackageInputStreamMode::Scan;
-                        if verify_crc16(&result) {
-                            result.pop();
-                            result.pop();
-                            return Some(Ok(result));
-                        } else {
-                            return Some(Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "CRC failure",
-                            )));
+                        match result {
+                            Err(e) => {
+                                return Some(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+                            }
+                            Ok(mut result) => {
+                                self.buf.clear();
+                                self.mode = PackageInputStreamMode::Scan;
+                                if verify_crc16(&result) {
+                                    result.pop();
+                                    result.pop();
+                                    return Some(Ok(result));
+                                } else {
+                                    return Some(Err(std::io::Error::new(
+                                        std::io::ErrorKind::Other,
+                                        CRCError,
+                                    )));
+                                }
+                            }
                         }
                     }
                     (_b, PackageInputStreamMode::Read) => {
@@ -151,9 +189,20 @@ where
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum EventType {
     PressStart,
     PressEnd,
+}
+
+impl EventType {
+    fn value(self) -> u8 {
+        use EventType::*;
+        match self {
+            PressStart => 0x00,
+            PressEnd => 0x80,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -163,12 +212,8 @@ pub struct Event {
 
 impl Event {
     pub fn new(event_type: EventType, button: u8) -> Event {
-        let event_mask = match event_type {
-            EventType::PressStart => 0x00,
-            EventType::PressEnd => 0x80,
-        };
         Event {
-            data: event_mask | 0x40 | (button & 0x1F),
+            data: event_type.value() | 0x40 | (button & 0x1F),
         }
     }
 
@@ -185,15 +230,95 @@ impl Event {
     }
 
     pub fn event_type(self) -> EventType {
+        use EventType::*;
         if self.data & 0x80 == 0 {
-            EventType::PressStart
+            PressStart
         } else {
-            EventType::PressEnd
+            PressEnd
         }
     }
 
     pub fn button(self) -> u8 {
         self.data & 0x1F
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum CommandType {
+    None,
+    Refresh,
+    Toggle,
+    Off,
+    On,
+}
+
+impl CommandType {
+    fn value(self) -> u8 {
+        use CommandType::*;
+        match self {
+            None => 0x00,
+            Refresh => 0x20,
+            Toggle => 0x40,
+            Off => 0x80,
+            On => 0xC0,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Command {
+    data: u8,
+}
+
+impl Command {
+    pub fn new(command_type: CommandType, output: u8) -> Command {
+        Command {
+            data: command_type.value() | (output & 0x1F),
+        }
+    }
+
+    pub fn from_raw(data: u8) -> Command {
+        Command { data }
+    }
+
+    pub fn raw(self) -> u8 {
+        self.data
+    }
+
+    pub fn command_type(self) -> CommandType {
+        use CommandType::*;
+        match self.data & 0xE0 {
+            0x00 => None,
+            0x20 => Refresh,
+            0x40 => Toggle,
+            0x80 => Off,
+            0xC0 => On,
+            _ => panic!("Unknown command type"),
+        }
+    }
+
+    pub fn output(self) -> u8 {
+        self.data & 0x1F
+    }
+}
+
+pub struct Package {
+    events: Vec<Event>,
+    state: u32,
+}
+
+impl Package {
+    pub fn from_buf(buf: &[u8]) -> Package {
+        if buf.len() != 36 {
+            panic!("Buf length is not 36!");
+        }
+        Package {
+            events: (&buf[0..32]).iter().map(|b| Event::frow_raw(*b)).collect(),
+            state: (u32::from(buf[32]) << 24)
+                | (u32::from(buf[33]) << 16)
+                | (u32::from(buf[34]) << 8)
+                | u32::from(buf[35]),
+        }
     }
 }
 
