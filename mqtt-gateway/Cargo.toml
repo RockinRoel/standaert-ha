@@ -5,6 +5,9 @@ authors = ["Roel Standaert <roel@abittechnical.com>"]
 edition = "2018"
 
 [dependencies]
-serialport = "3.2"
 crc16 = "*"
 rumqtt = "0.30"
+
+[dependencies.serialport]
+git = "https://gitlab.com/susurrus/serialport-rs"
+default-features = false
