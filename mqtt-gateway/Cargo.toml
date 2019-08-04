@@ -7,7 +7,11 @@ edition = "2018"
 [dependencies]
 crc16 = "*"
 rumqtt = "0.30"
-
-[dependencies.serialport]
-git = "https://gitlab.com/susurrus/serialport-rs"
-default-features = false
+toml = "0.5"
+serde = "1"
+serde_derive = "1"
+serde_millis = "0.1"
+log = "0.4"
+env_logger = "0.6"
+clap = "2"
+serialport = { git = "https://gitlab.com/susurrus/serialport-rs", default-features = false }

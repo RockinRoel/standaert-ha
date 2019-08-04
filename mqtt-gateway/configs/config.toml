@@ -1,0 +1,8 @@
+[mqtt]
+host = "127.0.0.1"
+
+[mqtt.homeassistant]
+enabled = true
+
+[serial]
+port = "/dev/ttyUSB0"

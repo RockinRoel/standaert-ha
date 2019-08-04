@@ -1,5 +1,8 @@
+pub mod config;
+pub mod mqtt;
+
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt;
 
 pub const SLIP_END: u8 = 0o300;
 pub const SLIP_ESC: u8 = 0o333;
@@ -9,8 +12,8 @@ pub const SLIP_ESC_ESC: u8 = 0o335;
 #[derive(Debug, Clone)]
 pub struct SlipError;
 
-impl Display for SlipError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+impl fmt::Display for SlipError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SLIP decoding error")
     }
 }
@@ -28,8 +31,8 @@ impl Error for SlipError {
 #[derive(Debug, Clone)]
 pub struct CRCError;
 
-impl Display for CRCError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+impl fmt::Display for CRCError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CRC error")
     }
 }
@@ -155,7 +158,10 @@ where
                         let result = slip_decode(&self.buf);
                         match result {
                             Err(e) => {
-                                return Some(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+                                return Some(Err(std::io::Error::new(
+                                    std::io::ErrorKind::Other,
+                                    e,
+                                )));
                             }
                             Ok(mut result) => {
                                 self.buf.clear();
@@ -189,7 +195,7 @@ where
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum EventType {
     PressStart,
     PressEnd,
@@ -240,6 +246,18 @@ impl Event {
 
     pub fn button(self) -> u8 {
         self.data & 0x1F
+    }
+}
+
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Event( ")?;
+        if self.valid() {
+            write!(f, "{:?}( button: {}, ", self.event_type(), self.button())?;
+        } else {
+            write!(f, "Invalid( ")?;
+        }
+        write!(f, "raw: 0x{:02x} ) )", self.raw())
     }
 }
 
@@ -319,6 +337,24 @@ impl Package {
                 | (u32::from(buf[34]) << 8)
                 | u32::from(buf[35]),
         }
+    }
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Package( state: {:032b}, events: [ ", self.state)?;
+        let mut first = true;
+        for event in self.events.iter() {
+            if event.valid() {
+                if first {
+                    first = false;
+                } else {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{:?}", event)?;
+            }
+        }
+        write!(f, " ] )")
     }
 }
 
