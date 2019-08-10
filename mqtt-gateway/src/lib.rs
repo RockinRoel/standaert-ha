@@ -1,5 +1,8 @@
 pub mod config;
+#[cfg(feature = "mqtt")]
 pub mod mqtt;
+#[cfg(feature = "webthing")]
+pub mod webthing;
 
 use std::error::Error;
 use std::fmt;
@@ -195,7 +198,7 @@ where
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventType {
     PressStart,
     PressEnd,
@@ -356,6 +359,11 @@ impl fmt::Debug for Package {
         }
         write!(f, " ] )")
     }
+}
+
+pub trait Service {
+    fn handle_package(&mut self, package: &Package);
+    fn join(&mut self);
 }
 
 #[cfg(test)]

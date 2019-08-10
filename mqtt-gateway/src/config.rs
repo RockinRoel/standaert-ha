@@ -1,12 +1,18 @@
 use log::debug;
 use serde_derive::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub mqtt: MqttConfig,
+    pub webthing: WebThingConfig,
     pub serial: SerialConfig,
+    #[serde(default = "default_lights_config")]
+    pub lights: HashMap<String, LightConfig>,
+    #[serde(default = "default_buttons_config")]
+    pub buttons: HashMap<String, ButtonConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,16 +42,37 @@ pub struct SerialConfig {
     pub timeout: Duration,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WebThingConfig {
+    #[serde(default = "default_webthing_enabled")]
+    pub enabled: bool,
+    pub base_uri: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LightConfig {
+    pub index: u8,
+    #[serde(default = "default_light_name")]
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ButtonConfig {
+    pub index: u8,
+    #[serde(default = "default_button_name")]
+    pub name: String,
+}
+
 fn default_ha_enabled() -> bool {
     false
 }
 
 fn default_ha_prefix() -> String {
-    String::from("standaertha")
+    "homeassistant".to_owned()
 }
 
 fn default_mqtt_client_id() -> String {
-    String::from("standaertha-gateway")
+    "standaertha-gateway".to_owned()
 }
 
 fn default_mqtt_port() -> u16 {
@@ -58,6 +85,26 @@ fn default_serial_baud_rate() -> u32 {
 
 fn default_serial_timeout() -> Duration {
     Duration::from_secs(1)
+}
+
+fn default_webthing_enabled() -> bool {
+    false
+}
+
+fn default_lights_config() -> HashMap<String, LightConfig> {
+    HashMap::new()
+}
+
+fn default_buttons_config() -> HashMap<String, ButtonConfig> {
+    HashMap::new()
+}
+
+fn default_light_name() -> String {
+    "".to_owned()
+}
+
+fn default_button_name() -> String {
+    "".to_owned()
 }
 
 pub fn read_config() -> Result<Config, Box<dyn std::error::Error + 'static>> {

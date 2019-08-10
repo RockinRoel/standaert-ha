@@ -1,7 +1,10 @@
 use log::debug;
-use rumqtt::MqttOptions;
 use serialport::prelude::*;
-use standaertha_mqtt_gateway::{config, mqtt, Package, PackageInputStream};
+#[cfg(feature = "mqtt")]
+use standaertha_mqtt_gateway::mqtt;
+#[cfg(feature = "webthing")]
+use standaertha_mqtt_gateway::webthing;
+use standaertha_mqtt_gateway::{config, Package, PackageInputStream, Service};
 use std::io::Read;
 
 const MAX_COMMANDS: usize = 64;
@@ -11,7 +14,23 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     let config = config::read_config()?;
 
-    mqtt::init(&config.mqtt)?;
+    let mut services: Vec<Box<dyn Service>> = vec![];
+
+    #[cfg(feature = "mqtt")]
+    {
+        let mqtt = mqtt::init(&config)?;
+        if mqtt.is_some() {
+            services.push(mqtt.unwrap());
+        }
+    }
+
+    #[cfg(feature = "webthing")]
+    {
+        let thing = webthing::init(&config)?;
+        if thing.is_some() {
+            services.push(thing.unwrap());
+        }
+    }
 
     /*
     thread::spawn(move || {
@@ -47,13 +66,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         timeout: config.serial.timeout,
     };
     debug!("Using serial port: {}", config.serial.port);
-    let serial = serialport::open_with_settings(&config.serial.port, &s)?;
+    let serial = serialport::open_with_settings(&config.serial.port, &s).unwrap();
+
     for p in PackageInputStream::new(serial.bytes())
         .filter_map(|p| p.ok())
         .filter(|p| p.len() == 36)
         .map(|p| Package::from_buf(&p[0..36]))
     {
         debug!("{:?}", p);
+        for service in &mut services {
+            service.handle_package(&p);
+        }
+    }
+
+    for service in &mut services {
+        service.join();
     }
 
     Ok(())
