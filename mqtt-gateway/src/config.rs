@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::time::Duration;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     pub mqtt: MqttConfig,
     pub webthing: WebThingConfig,
@@ -15,7 +15,7 @@ pub struct Config {
     pub buttons: HashMap<String, ButtonConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct MqttConfig {
     #[serde(default = "default_mqtt_client_id")]
     pub client_id: String,
@@ -25,7 +25,7 @@ pub struct MqttConfig {
     pub homeassistant: HomeAssistantConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct HomeAssistantConfig {
     #[serde(default = "default_ha_enabled")]
     pub enabled: bool,
@@ -33,7 +33,7 @@ pub struct HomeAssistantConfig {
     pub prefix: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct SerialConfig {
     pub port: String,
     #[serde(default = "default_serial_baud_rate")]
@@ -42,21 +42,21 @@ pub struct SerialConfig {
     pub timeout: Duration,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct WebThingConfig {
     #[serde(default = "default_webthing_enabled")]
     pub enabled: bool,
     pub base_uri: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct LightConfig {
     pub index: u8,
     #[serde(default = "default_light_name")]
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ButtonConfig {
     pub index: u8,
     #[serde(default = "default_button_name")]

@@ -1,7 +1,7 @@
 use super::{config, Command, CommandType, EventType, Package, Service};
+use crossbeam::channel::Sender;
 use log::info;
 use serde_json::json;
-use std::sync::mpsc;
 use std::sync::{Arc, RwLock, Weak};
 use std::thread;
 use std::thread::JoinHandle;
@@ -18,11 +18,11 @@ type Things = Vec<Option<Arc<RwLock<Box<Thing + 'static>>>>>;
 
 struct OnValueForwarder {
     index: u8,
-    sender: mpsc::SyncSender<Command>,
+    sender: Sender<Command>,
 }
 struct Generator {
     lights: Things,
-    sender: mpsc::SyncSender<Command>,
+    sender: Sender<Command>,
 }
 
 impl ValueForwarder for OnValueForwarder {
@@ -43,7 +43,7 @@ impl ValueForwarder for OnValueForwarder {
 pub struct ToggleAction {
     action: BaseAction,
     index: u8,
-    sender: mpsc::SyncSender<Command>,
+    sender: Sender<Command>,
 }
 
 impl ToggleAction {
@@ -51,7 +51,7 @@ impl ToggleAction {
         input: Option<serde_json::Map<String, serde_json::Value>>,
         index: u8,
         thing: Weak<RwLock<Box<Thing>>>,
-        sender: mpsc::SyncSender<Command>,
+        sender: Sender<Command>,
     ) -> ToggleAction {
         ToggleAction {
             action: BaseAction::new(
@@ -141,7 +141,7 @@ impl Action for ToggleAction {
     }
 }
 
-impl ActionGenerator for Generator {
+impl<'a> ActionGenerator for Generator {
     fn generate(
         &self,
         thing: Weak<RwLock<Box<Thing>>>,
@@ -274,7 +274,7 @@ impl Service for WebThingService {
 
 pub fn init(
     config: &config::Config,
-    sender: mpsc::SyncSender<Command>,
+    sender: &Sender<Command>,
 ) -> Result<Option<Box<dyn Service>>, Box<dyn std::error::Error + 'static>> {
     if !config.webthing.enabled {
         return Ok(None);
@@ -371,6 +371,7 @@ pub fn init(
         }
     }
     let lights_clone = lights.clone();
+    let sender_clone = sender.clone();
     let handle = thread::spawn(move || {
         let mut server = WebThingServer::new(
             ThingsType::Multiple(things, "MyDevice".to_owned()),
@@ -379,7 +380,7 @@ pub fn init(
             None,
             Box::new(Generator {
                 lights: lights_clone,
-                sender,
+                sender: sender_clone,
             }),
             None,
             None,

@@ -1,3 +1,4 @@
+use crossbeam::crossbeam_channel::unbounded;
 use log::{debug, error, info};
 use serialport::prelude::*;
 #[cfg(feature = "mqtt")]
@@ -9,25 +10,24 @@ use standaertha_mqtt_gateway::{
 };
 use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 const MAX_COMMANDS: usize = 64;
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    env_logger::init();
+    pretty_env_logger::init();
 
     let config = config::read_config()?;
 
     let mut services: Vec<Box<dyn Service>> = vec![];
 
-    let (sender, recv) = mpsc::sync_channel(64);
+    let (sender, recv) = unbounded();
 
     #[cfg(feature = "mqtt")]
     {
-        let sender_clone = sender.clone();
-        let mqtt = mqtt::init(&config, sender_clone)?;
+        let mqtt = mqtt::init(&config, &sender)?;
         if mqtt.is_some() {
             services.push(mqtt.unwrap());
         }
@@ -35,8 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     #[cfg(feature = "webthing")]
     {
-        let sender_clone = sender.clone();
-        let thing = webthing::init(&config, sender_clone)?;
+        let thing = webthing::init(&config, &sender)?;
         if thing.is_some() {
             services.push(thing.unwrap());
         }
@@ -96,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         if let Ok(c) = recv.recv_timeout(Duration::from_millis(1000)) {
             let mut cmds = vec![c.raw()];
             let now = Instant::now();
-            let timeout_duration = Duration::from_micros(2500);
+            let timeout_duration = Duration::from_millis(100);
             let timeout = now + timeout_duration;
             let mut remaining = timeout_duration;
             while let Ok(c) = recv.recv_timeout(remaining) {

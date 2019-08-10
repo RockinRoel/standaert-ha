@@ -321,6 +321,7 @@ impl Command {
     }
 }
 
+#[derive(Clone)]
 pub struct Package {
     events: Vec<Event>,
     state: u32,

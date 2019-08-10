@@ -9,7 +9,7 @@ edition = "2018"
 ctrlc = { version = "3.1", features = ["termination"] }
 # For serial
 crc16 = "*"
-serialport = { git = "https://gitlab.com/susurrus/serialport-rs", default-features = false }
+serialport = { version = "3.3", default-features = false }
 # For config
 toml = "0.5"
 serde = "1"
@@ -19,17 +19,18 @@ serde_millis = "0.1"
 clap = "2"
 # For logging
 log = "0.4"
-env_logger = "0.6"
+pretty_env_logger = "0.3"
 # For task queueing
-mio = "0.5"
+crossbeam = "0.7"
 # For MQTT and Web Thing
 serde_json = "1.0"
 # For MQTT
 rumqtt = { version = "0.30", optional = true }
+regex = { version = "1", optional = true }
 # For Web Thing
 webthing = { version = "0.12", optional = true }
 uuid = "0.7"
 
 [features]
 default = ["mqtt", "webthing"]
-mqtt = ["rumqtt"]
+mqtt = ["rumqtt", "regex"]
