@@ -1,11 +1,17 @@
-use log::debug;
+use log::{debug, error, info};
 use serialport::prelude::*;
 #[cfg(feature = "mqtt")]
 use standaertha_mqtt_gateway::mqtt;
 #[cfg(feature = "webthing")]
 use standaertha_mqtt_gateway::webthing;
-use standaertha_mqtt_gateway::{config, Package, PackageInputStream, Service};
+use standaertha_mqtt_gateway::{
+    append_crc16, config, slip_encode, Package, PackageInputStream, Service,
+};
 use std::io::Read;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const MAX_COMMANDS: usize = 64;
 
@@ -16,9 +22,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     let mut services: Vec<Box<dyn Service>> = vec![];
 
+    let (sender, recv) = mpsc::sync_channel(64);
+
     #[cfg(feature = "mqtt")]
     {
-        let mqtt = mqtt::init(&config)?;
+        let sender_clone = sender.clone();
+        let mqtt = mqtt::init(&config, sender_clone)?;
         if mqtt.is_some() {
             services.push(mqtt.unwrap());
         }
@@ -26,7 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     #[cfg(feature = "webthing")]
     {
-        let thing = webthing::init(&config)?;
+        let sender_clone = sender.clone();
+        let thing = webthing::init(&config, sender_clone)?;
         if thing.is_some() {
             services.push(thing.unwrap());
         }
@@ -66,22 +76,75 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         timeout: config.serial.timeout,
     };
     debug!("Using serial port: {}", config.serial.port);
-    let serial = serialport::open_with_settings(&config.serial.port, &s).unwrap();
+    let mut serial = serialport::open_with_settings(&config.serial.port, &s).unwrap();
 
-    for p in PackageInputStream::new(serial.bytes())
-        .filter_map(|p| p.ok())
-        .filter(|p| p.len() == 36)
-        .map(|p| Package::from_buf(&p[0..36]))
-    {
-        debug!("{:?}", p);
-        for service in &mut services {
-            service.handle_package(&p);
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        info!("Received interrupt, stopping...");
+        r.store(false, Ordering::SeqCst);
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    let input = serial.try_clone().unwrap().bytes();
+
+    let r = running.clone();
+    let cmd_thread = thread::spawn(move || loop {
+        if !r.load(Ordering::SeqCst) {
+            break;
+        }
+        if let Ok(c) = recv.recv_timeout(Duration::from_millis(1000)) {
+            let mut cmds = vec![c.raw()];
+            let now = Instant::now();
+            let timeout_duration = Duration::from_micros(2500);
+            let timeout = now + timeout_duration;
+            let mut remaining = timeout_duration;
+            while let Ok(c) = recv.recv_timeout(remaining) {
+                cmds.push(c.raw());
+                if cmds.len() >= MAX_COMMANDS {
+                    break;
+                }
+                let now = Instant::now();
+                if now > timeout {
+                    break;
+                }
+                remaining = timeout - now;
+            }
+            cmds = append_crc16(cmds);
+            serial.write_all(&slip_encode(&cmds)).unwrap();
+        }
+    });
+
+    for p in PackageInputStream::new(input) {
+        match p {
+            Ok(p) => {
+                if p.len() == 36 {
+                    let pkg = Package::from_buf(&p[0..36]);
+                    debug!("Package: {:?}", pkg);
+                    for service in &mut services {
+                        service.handle_package(&pkg);
+                    }
+                } else {
+                    info!("Discarding package of length != 36, was {}", p.len());
+                }
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::TimedOut {
+                    debug!("Routine timeout on serial input");
+                } else {
+                    error!("Error on input stream: {:?}", e);
+                }
+            }
+        }
+        if !running.load(Ordering::SeqCst) {
+            break;
         }
     }
 
     for service in &mut services {
         service.join();
     }
+    cmd_thread.join().unwrap();
 
     Ok(())
 }

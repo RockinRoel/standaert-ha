@@ -188,9 +188,7 @@ where
                     (_, PackageInputStreamMode::Scan) => {}
                 },
                 Err(e) => {
-                    if e.kind() != std::io::ErrorKind::TimedOut {
-                        return Some(Err(e));
-                    }
+                    return Some(Err(e));
                 }
             }
         }

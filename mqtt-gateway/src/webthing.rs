@@ -1,7 +1,7 @@
-use super::{config, EventType, Package, Service};
-use log::debug;
+use super::{config, Command, CommandType, EventType, Package, Service};
+use log::info;
 use serde_json::json;
-use std::collections::HashMap;
+use std::sync::mpsc;
 use std::sync::{Arc, RwLock, Weak};
 use std::thread;
 use std::thread::JoinHandle;
@@ -14,71 +14,97 @@ use webthing::{
     WebThingServer,
 };
 
-struct OnValueForwarder;
-struct Generator;
+type Things = Vec<Option<Arc<RwLock<Box<Thing + 'static>>>>>;
+
+struct OnValueForwarder {
+    index: u8,
+    sender: mpsc::SyncSender<Command>,
+}
+struct Generator {
+    lights: Things,
+    sender: mpsc::SyncSender<Command>,
+}
 
 impl ValueForwarder for OnValueForwarder {
     fn set_value(&mut self, value: serde_json::Value) -> Result<serde_json::Value, &'static str> {
-        println!("On-State is now {}", value);
+        info!("Setting value of output {} to {}", self.index, value);
+        let cmd_type = if value.as_bool().unwrap() {
+            CommandType::On
+        } else {
+            CommandType::Off
+        };
+        self.sender
+            .send(Command::new(cmd_type, self.index))
+            .unwrap();
         Ok(value)
     }
 }
 
-pub struct ToggleAction(BaseAction);
+pub struct ToggleAction {
+    action: BaseAction,
+    index: u8,
+    sender: mpsc::SyncSender<Command>,
+}
 
 impl ToggleAction {
     fn new(
         input: Option<serde_json::Map<String, serde_json::Value>>,
+        index: u8,
         thing: Weak<RwLock<Box<Thing>>>,
+        sender: mpsc::SyncSender<Command>,
     ) -> ToggleAction {
-        ToggleAction(BaseAction::new(
-            Uuid::new_v4().to_string(),
-            "toggle".to_owned(),
-            input,
-            thing,
-        ))
+        ToggleAction {
+            action: BaseAction::new(
+                Uuid::new_v4().to_string(),
+                "toggle".to_owned(),
+                input,
+                thing,
+            ),
+            index,
+            sender,
+        }
     }
 }
 
 impl Action for ToggleAction {
     fn set_href_prefix(&mut self, prefix: String) {
-        self.0.set_href_prefix(prefix)
+        self.action.set_href_prefix(prefix)
     }
 
     fn get_id(&self) -> String {
-        self.0.get_id()
+        self.action.get_id()
     }
 
     fn get_name(&self) -> String {
-        self.0.get_name()
+        self.action.get_name()
     }
 
     fn get_href(&self) -> String {
-        self.0.get_href()
+        self.action.get_href()
     }
 
     fn get_status(&self) -> String {
-        self.0.get_status()
+        self.action.get_status()
     }
 
     fn get_time_requested(&self) -> String {
-        self.0.get_time_requested()
+        self.action.get_time_requested()
     }
 
     fn get_time_completed(&self) -> Option<String> {
-        self.0.get_time_completed()
+        self.action.get_time_completed()
     }
 
     fn get_input(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
-        self.0.get_input()
+        self.action.get_input()
     }
 
     fn get_thing(&self) -> Option<Arc<RwLock<Box<Thing>>>> {
-        self.0.get_thing()
+        self.action.get_thing()
     }
 
     fn set_status(&mut self, status: String) {
-        self.0.set_status(status)
+        self.action.set_status(status)
     }
 
     fn perform_action(&mut self) {
@@ -91,31 +117,27 @@ impl Action for ToggleAction {
         let name = self.get_name();
         let id = self.get_id();
 
+        info!("Toggling value of output {}", self.index);
+        self.sender
+            .send(Command::new(CommandType::Toggle, self.index))
+            .unwrap();
+
         thread::spawn(move || {
-            debug!("Performing TOGGLE action!");
             let mut thing = thing.write().unwrap();
-            let prev_state = thing
-                .get_property("on".to_owned())
-                .unwrap()
-                .as_bool()
-                .unwrap();
-            thing
-                .set_property("on".to_owned(), json!(!prev_state))
-                .expect("Can't set property?");
             thing.finish_action(name, id);
         });
     }
 
     fn start(&mut self) {
-        self.0.start()
+        self.action.start()
     }
 
     fn cancel(&mut self) {
-        self.0.cancel()
+        self.action.cancel()
     }
 
     fn finish(&mut self) {
-        self.0.finish()
+        self.action.finish()
     }
 }
 
@@ -134,11 +156,26 @@ impl ActionGenerator for Generator {
             None => None,
         };
 
-        //        thing.upgrade().unwrap().write().unwrap().property_notify("on".to_owned(), json!(true));
+        let mut index = None;
+        let arc_thing = thing.upgrade().unwrap();
+        for i in 0..32 {
+            match &self.lights[i] {
+                Some(light) if Arc::ptr_eq(light, &arc_thing) => {
+                    index = Some(i as u8);
+                    break;
+                }
+                _ => {}
+            }
+        }
 
         let name: &str = &name;
-        match name {
-            "toggle" => Some(Box::new(ToggleAction::new(input, thing))),
+        match (name, index) {
+            ("toggle", Some(index)) => Some(Box::new(ToggleAction::new(
+                input,
+                index,
+                thing,
+                self.sender.clone(),
+            ))),
             _ => None,
         }
     }
@@ -168,17 +205,13 @@ impl Event for PressedEvent {
 
 struct WebThingService {
     thread: Option<JoinHandle<()>>,
-    buttons: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>>,
-    lights: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>>,
+    buttons: Things,
+    lights: Things,
     last_button_state: [Option<(Instant, bool)>; 32],
 }
 
 impl WebThingService {
-    fn new(
-        thread: JoinHandle<()>,
-        buttons: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>>,
-        lights: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>>,
-    ) -> WebThingService {
+    fn new(thread: JoinHandle<()>, buttons: Things, lights: Things) -> WebThingService {
         WebThingService {
             thread: Some(thread),
             buttons,
@@ -190,11 +223,11 @@ impl WebThingService {
 
 impl Service for WebThingService {
     fn handle_package(&mut self, package: &Package) {
-        for i in 0..31 {
+        for i in 0..32 {
             let light_state = package.state & (1 << i) != 0;
-            let light = self.lights.get(&i);
-            if light.is_some() {
-                let mut light = light.unwrap().write().unwrap();
+            let light = &mut self.lights[i];
+            if let Some(light) = light {
+                let mut light = light.write().unwrap();
                 let prev_state = light
                     .get_property("on".to_owned())
                     .unwrap()
@@ -212,9 +245,9 @@ impl Service for WebThingService {
                 let last_state = self.last_button_state[event.button() as usize];
                 let state = event.event_type() == EventType::PressStart;
                 let now = Instant::now();
-                let button = self.buttons.get(&event.button());
-                if button.is_some() {
-                    let mut button = button.unwrap().write().unwrap();
+                let button = &self.buttons[event.button() as usize];
+                if let Some(button) = button {
+                    let mut button = button.write().unwrap();
                     if let Some(last_state) = last_state {
                         if last_state.1 && !state {
                             let duration = now - last_state.0;
@@ -223,7 +256,8 @@ impl Service for WebThingService {
                             }
                         }
                     }
-                    button.set_property("pushed".to_owned(), json!(state))
+                    button
+                        .set_property("pushed".to_owned(), json!(state))
                         .expect("Can't set property?");
                 }
                 self.last_button_state[event.button() as usize] = Some((now, state));
@@ -240,14 +274,19 @@ impl Service for WebThingService {
 
 pub fn init(
     config: &config::Config,
+    sender: mpsc::SyncSender<Command>,
 ) -> Result<Option<Box<dyn Service>>, Box<dyn std::error::Error + 'static>> {
     if !config.webthing.enabled {
         return Ok(None);
     }
 
-    let mut things: Vec<Arc<RwLock<Box<Thing + 'static>>>> = Vec::new();
-    let mut lights: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>> = HashMap::new();
-    let mut buttons: HashMap<u8, Arc<RwLock<Box<Thing + 'static>>>> = HashMap::new();
+    let mut lights = Things::new();
+    let mut buttons = Things::new();
+
+    for _i in 0..32 {
+        lights.push(None);
+        buttons.push(None);
+    }
 
     // FIXME: implement buttons
     for (button_id, button_config) in &config.buttons {
@@ -280,8 +319,7 @@ pub fn init(
         let pressed_event_desc = pressed_event_desc.as_object().unwrap().clone();
         thing.add_available_event("pressed".to_owned(), pressed_event_desc);
         let thing: Arc<RwLock<Box<Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
-        things.push(thing.clone());
-        buttons.insert(button_config.index, thing);
+        buttons[button_config.index as usize] = Some(thing);
     }
 
     for (light_id, light_config) in &config.lights {
@@ -305,7 +343,10 @@ pub fn init(
         thing.add_property(Box::new(BaseProperty::new(
             "on".to_owned(),
             json!(false),
-            Some(Box::new(OnValueForwarder)),
+            Some(Box::new(OnValueForwarder {
+                index: light_config.index,
+                sender: sender.clone(),
+            })),
             Some(on_description),
         )));
         let toggle_metadata = json!({
@@ -315,17 +356,31 @@ pub fn init(
         let toggle_metadata = toggle_metadata.as_object().unwrap().clone();
         thing.add_available_action("toggle".to_owned(), toggle_metadata);
         let thing: Arc<RwLock<Box<Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
-        things.push(thing.clone());
-        lights.insert(light_config.index, thing);
+        lights[light_config.index as usize] = Some(thing);
     }
 
+    let mut things = vec![];
+    for button in buttons.iter() {
+        if let Some(button) = button {
+            things.push(button.clone());
+        }
+    }
+    for light in lights.iter() {
+        if let Some(light) = light {
+            things.push(light.clone());
+        }
+    }
+    let lights_clone = lights.clone();
     let handle = thread::spawn(move || {
         let mut server = WebThingServer::new(
             ThingsType::Multiple(things, "MyDevice".to_owned()),
             Some(8888),
             None,
             None,
-            Box::new(Generator),
+            Box::new(Generator {
+                lights: lights_clone,
+                sender,
+            }),
             None,
             None,
         );

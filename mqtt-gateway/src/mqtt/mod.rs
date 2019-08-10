@@ -1,8 +1,9 @@
 pub mod homeassistant;
 
-use super::{config, Package, Service};
-use log::warn;
+use super::{config, Command, Package, Service};
+use log::{debug, warn};
 use rumqtt::{MqttClient, MqttOptions};
+use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
 
@@ -19,7 +20,7 @@ impl MqttService {
 }
 
 impl Service for MqttService {
-    fn handle_package(&mut self, package: &Package) { }
+    fn handle_package(&mut self, package: &Package) {}
     fn join(&mut self) {
         if self.thread.is_some() {
             self.thread.take().unwrap().join().expect("Can't join?");
@@ -27,7 +28,10 @@ impl Service for MqttService {
     }
 }
 
-pub fn init(config: &config::Config) -> Result<Option<Box<dyn Service>>, Box<dyn std::error::Error + 'static>> {
+pub fn init(
+    config: &config::Config,
+    sender: mpsc::SyncSender<Command>,
+) -> Result<Option<Box<dyn Service>>, Box<dyn std::error::Error + 'static>> {
     if !config.mqtt.homeassistant.enabled {
         warn!("No MQTT service is enabled, not setting up MQTT");
         return Ok(None);
@@ -46,8 +50,8 @@ pub fn init(config: &config::Config) -> Result<Option<Box<dyn Service>>, Box<dyn
         homeassistant::init(&config, &mut mqtt)?;
     }
 
-    let thread = thread::spawn(move || {
-      for n in notifications {}
+    let thread = thread::spawn(move || for n in notifications {
+        debug!("{:?}", n);
     });
 
     Ok(Some(Box::new(MqttService::new(thread))))

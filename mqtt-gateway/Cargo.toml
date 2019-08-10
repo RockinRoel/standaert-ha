@@ -5,6 +5,8 @@ authors = ["Roel Standaert <roel@abittechnical.com>"]
 edition = "2018"
 
 [dependencies]
+# General control
+ctrlc = { version = "3.1", features = ["termination"] }
 # For serial
 crc16 = "*"
 serialport = { git = "https://gitlab.com/susurrus/serialport-rs", default-features = false }
