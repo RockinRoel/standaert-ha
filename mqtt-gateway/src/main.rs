@@ -6,7 +6,7 @@ use standaertha_mqtt_gateway::mqtt;
 #[cfg(feature = "webthing")]
 use standaertha_mqtt_gateway::webthing;
 use standaertha_mqtt_gateway::{
-    append_crc16, config, slip_encode, Package, PackageInputStream, Service,
+    append_crc16, config, slip_encode, Command, CommandType, Package, PackageInputStream, Service,
 };
 use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -114,12 +114,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         }
     });
 
+    sender.send(Command::new(CommandType::Refresh, 0)).unwrap();
+
+    let mut last_package = None;
     for p in PackageInputStream::new(input) {
         match p {
             Ok(p) => {
                 if p.len() == 36 {
                     let pkg = Package::from_buf(&p[0..36]);
                     debug!("Package: {:?}", pkg);
+                    last_package = Some(Instant::now());
                     for service in &mut services {
                         service.handle_package(&pkg);
                     }
@@ -134,6 +138,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                     error!("Error on input stream: {:?}", e);
                 }
             }
+        }
+        if last_package.is_some() && Instant::now() - last_package.unwrap() > Duration::from_secs(10) {
+            sender.send(Command::new(CommandType::Refresh, 0)).unwrap();
         }
         if !running.load(Ordering::SeqCst) {
             break;
