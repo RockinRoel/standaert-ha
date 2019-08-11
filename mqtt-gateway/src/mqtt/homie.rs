@@ -16,7 +16,7 @@ impl MqttSubService for Homie {
     fn handle_package(&mut self, package: &Package) {
         for (light_id, light_config) in &self.config.lights {
             let i = light_config.index;
-            let light_state = package.state & (1 << i) != 0;
+            let light_state = package.state & (1 << (i as u32)) != 0;
             self.client
                 .publish(
                     format!(
@@ -143,10 +143,10 @@ pub fn init(
     )
     .expect("Could not publish homie name");
     let mut nodes: Vec<&str> = vec![];
-    for (button_id, _) in &config.buttons {
+    for button_id in config.buttons.keys() {
         nodes.push(button_id);
     }
-    for (light_id, _) in &config.lights {
+    for light_id in config.lights.keys() {
         nodes.push(light_id);
     }
     let nodes_str = nodes.join(",");
@@ -158,7 +158,7 @@ pub fn init(
     )
     .expect("Could not publish homie nodes");
 
-    for (button_id, _button_config) in &config.buttons {
+    for button_id in config.buttons.keys() {
         let node_prefix = format!("{0}/$nodes/{1}", homie_prefix, button_id);
         mqtt.publish(
             format!("{0}/$name", node_prefix),
@@ -212,7 +212,7 @@ pub fn init(
         .expect("Could not publish pressed property retained = false");
     }
 
-    for (light_id, _light_config) in &config.lights {
+    for light_id in config.lights.keys() {
         let node_prefix = format!("{0}/$nodes/{1}", homie_prefix, light_id);
         mqtt.publish(
             format!("{0}/$name", node_prefix),

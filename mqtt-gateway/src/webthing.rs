@@ -14,7 +14,7 @@ use webthing::{
     WebThingServer,
 };
 
-type Things = Vec<Option<Arc<RwLock<Box<Thing + 'static>>>>>;
+type Things = Vec<Option<Arc<RwLock<Box<dyn Thing + 'static>>>>>;
 
 struct OnValueForwarder {
     index: u8,
@@ -50,7 +50,7 @@ impl ToggleAction {
     fn new(
         input: Option<serde_json::Map<String, serde_json::Value>>,
         index: u8,
-        thing: Weak<RwLock<Box<Thing>>>,
+        thing: Weak<RwLock<Box<dyn Thing>>>,
         sender: Sender<Command>,
     ) -> ToggleAction {
         ToggleAction {
@@ -87,6 +87,10 @@ impl Action for ToggleAction {
         self.action.get_status()
     }
 
+    fn get_thing(&self) -> Option<Arc<RwLock<Box<dyn Thing>>>> {
+        self.action.get_thing()
+    }
+
     fn get_time_requested(&self) -> String {
         self.action.get_time_requested()
     }
@@ -99,12 +103,12 @@ impl Action for ToggleAction {
         self.action.get_input()
     }
 
-    fn get_thing(&self) -> Option<Arc<RwLock<Box<Thing>>>> {
-        self.action.get_thing()
-    }
-
     fn set_status(&mut self, status: String) {
         self.action.set_status(status)
+    }
+
+    fn start(&mut self) {
+        self.action.start()
     }
 
     fn perform_action(&mut self) {
@@ -128,10 +132,6 @@ impl Action for ToggleAction {
         });
     }
 
-    fn start(&mut self) {
-        self.action.start()
-    }
-
     fn cancel(&mut self) {
         self.action.cancel()
     }
@@ -144,10 +144,10 @@ impl Action for ToggleAction {
 impl<'a> ActionGenerator for Generator {
     fn generate(
         &self,
-        thing: Weak<RwLock<Box<Thing>>>,
+        thing: Weak<RwLock<Box<dyn Thing>>>,
         name: String,
         input: Option<&serde_json::Value>,
-    ) -> Option<Box<Action>> {
+    ) -> Option<Box<dyn Action>> {
         let input = match input {
             Some(v) => match v.as_object() {
                 Some(o) => Some(o.clone()),
@@ -318,7 +318,7 @@ pub fn init(
         });
         let pressed_event_desc = pressed_event_desc.as_object().unwrap().clone();
         thing.add_available_event("pressed".to_owned(), pressed_event_desc);
-        let thing: Arc<RwLock<Box<Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
+        let thing: Arc<RwLock<Box<dyn Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
         buttons[button_config.index as usize] = Some(thing);
     }
 
@@ -355,7 +355,7 @@ pub fn init(
         });
         let toggle_metadata = toggle_metadata.as_object().unwrap().clone();
         thing.add_available_action("toggle".to_owned(), toggle_metadata);
-        let thing: Arc<RwLock<Box<Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
+        let thing: Arc<RwLock<Box<dyn Thing + 'static>>> = Arc::new(RwLock::new(Box::new(thing)));
         lights[light_config.index as usize] = Some(thing);
     }
 

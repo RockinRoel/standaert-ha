@@ -17,7 +17,7 @@ impl MqttSubService for HomeAssistant {
     fn handle_package(&mut self, package: &Package) {
         for (light_id, light_config) in &self.config.lights {
             let i = light_config.index;
-            let light_state = package.state & (1 << i) != 0;
+            let light_state = package.state & (1 << (i as u32)) != 0;
             self.client
                 .publish(
                     format!(

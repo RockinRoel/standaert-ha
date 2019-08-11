@@ -26,7 +26,7 @@ impl Error for SlipError {
         "SLIP decoding error"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -45,7 +45,7 @@ impl Error for CRCError {
         "CRC error"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -417,7 +417,7 @@ mod tests {
             1, 2, 3, SLIP_END, 12, 0xC1, 0x8C, SLIP_END, 7, 9, SLIP_END, 88, 19, 0xA5, 0x44,
             SLIP_END,
         ];
-        let mut stream = PackageInputStream::new(buf.into_iter().map(|b| Ok(*b)));
+        let mut stream = PackageInputStream::new(buf.iter().map(|b| Ok(*b)));
         let pkg1 = stream.next().unwrap().unwrap();
         assert_eq!(pkg1, vec![12]);
         let pkg2 = stream.next().unwrap().unwrap();
