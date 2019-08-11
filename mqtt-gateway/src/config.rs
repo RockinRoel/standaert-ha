@@ -15,6 +15,34 @@ pub struct Config {
     pub buttons: HashMap<String, ButtonConfig>,
 }
 
+impl Config {
+    pub fn light_name<'a>(&'a self, light_id: &'a str) -> Option<&'a str> {
+        let light = self.lights.get(light_id);
+        if let Some(light) = light {
+            if light.name.is_empty() {
+                Some(light_id)
+            } else {
+                Some(&light.name)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn button_name<'a>(&'a self, button_id: &'a str) -> Option<&'a str> {
+        let button = self.buttons.get(button_id);
+        if let Some(button) = button {
+            if button.name.is_empty() {
+                Some(button_id)
+            } else {
+                Some(&button.name)
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct MqttConfig {
     #[serde(default = "default_mqtt_client_id")]
@@ -22,7 +50,10 @@ pub struct MqttConfig {
     pub host: String,
     #[serde(default = "default_mqtt_port")]
     pub port: u16,
+    #[serde(default = "default_ha_config")]
     pub homeassistant: HomeAssistantConfig,
+    #[serde(default = "default_homie_config")]
+    pub homie: HomieConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -31,6 +62,16 @@ pub struct HomeAssistantConfig {
     pub enabled: bool,
     #[serde(default = "default_ha_prefix")]
     pub prefix: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HomieConfig {
+    #[serde(default = "default_homie_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_homie_device_id")]
+    pub device_id: String,
+    #[serde(default = "default_homie_name")]
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -69,6 +110,33 @@ fn default_ha_enabled() -> bool {
 
 fn default_ha_prefix() -> String {
     "homeassistant".to_owned()
+}
+
+fn default_ha_config() -> HomeAssistantConfig {
+    HomeAssistantConfig {
+        enabled: default_ha_enabled(),
+        prefix: default_ha_prefix(),
+    }
+}
+
+fn default_homie_config() -> HomieConfig {
+    HomieConfig {
+        enabled: default_homie_enabled(),
+        device_id: default_homie_device_id(),
+        name: default_homie_name(),
+    }
+}
+
+fn default_homie_enabled() -> bool {
+    false
+}
+
+fn default_homie_device_id() -> String {
+    "standaertha-gateway".to_owned()
+}
+
+fn default_homie_name() -> String {
+    "Standaert Home Automation".to_owned()
 }
 
 fn default_mqtt_client_id() -> String {

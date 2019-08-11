@@ -26,7 +26,7 @@ impl MqttSubService for HomeAssistant {
                     ),
                     QoS::AtMostOnce,
                     false,
-                    if light_state { "ON" } else { "OFF" },
+                    if light_state { "true" } else { "false" },
                 )
                 .expect("Could not publish light state");
         }
@@ -44,7 +44,7 @@ impl MqttSubService for HomeAssistant {
                                         ),
                                         QoS::AtMostOnce,
                                         false,
-                                        "ON",
+                                        "true",
                                     )
                                     .expect("Could not publish button state");
                             }
@@ -57,7 +57,7 @@ impl MqttSubService for HomeAssistant {
                                         ),
                                         QoS::AtMostOnce,
                                         false,
-                                        "OFF",
+                                        "false",
                                     )
                                     .expect("Could not publish button state");
                             }
@@ -81,8 +81,8 @@ impl MqttSubService for HomeAssistant {
                 let light_id = cap.get(1).unwrap().as_str();
                 let payload: &Vec<u8> = &publish.payload;
                 let light_state = match &payload[..] {
-                    p if p == b"ON" => Some(true),
-                    p if p == b"OFF" => Some(false),
+                    p if p == b"true" => Some(true),
+                    p if p == b"false" => Some(false),
                     _ => None,
                 };
                 if let Some(light_state) = light_state {
@@ -114,6 +114,8 @@ pub fn init(
         let config_json = json!({
             "name": if button_config.name.is_empty() { button_id } else { &button_config.name },
             "state_topic": format!("{0}/binary_sensor/{1}", config.mqtt.homeassistant.prefix, button_id),
+            "payload_on": "true",
+            "payload_off": "false",
         });
         mqtt.publish(
             format!(
@@ -133,7 +135,7 @@ pub fn init(
             ),
             QoS::AtMostOnce,
             false,
-            "OFF",
+            "false",
         )
         .expect("Error publishing button state");
         */
@@ -144,6 +146,8 @@ pub fn init(
             "name": if light_config.name.is_empty() { light_id } else { &light_config.name },
             "command_topic": format!("{0}/switch/{1}/set", config.mqtt.homeassistant.prefix, light_id),
             "state_topic": format!("{0}/switch/{1}", config.mqtt.homeassistant.prefix, light_id),
+            "payload_on": "true",
+            "payload_off": "false",
         });
         mqtt.publish(
             format!(
@@ -160,7 +164,7 @@ pub fn init(
             format!("{0}/switch/{1}", config.mqtt.homeassistant.prefix, light_id),
             QoS::AtLeastOnce,
             false,
-            "OFF",
+            "false",
         )
         .expect("Error publishing switch state");
         */

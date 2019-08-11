@@ -1,4 +1,5 @@
 pub mod homeassistant;
+pub mod homie;
 
 use super::{config, Command, CommandType, EventType, Package, Service};
 use crossbeam::channel::Sender;
@@ -16,6 +17,7 @@ use std::time::Duration;
 pub trait MqttSubService {
     fn handle_package(&mut self, package: &Package);
     fn handle_notification(&mut self, notification: &Notification);
+    fn do_disconnect(&mut self) {}
 }
 
 struct MqttService {
@@ -55,16 +57,20 @@ pub fn init(
     config: &config::Config,
     sender: &Sender<Command>,
 ) -> Result<Option<Box<dyn Service>>, Box<dyn std::error::Error + 'static>> {
-    if !config.mqtt.homeassistant.enabled {
+    if !config.mqtt.homeassistant.enabled && !config.mqtt.homie.enabled {
         warn!("No MQTT service is enabled, not setting up MQTT");
         return Ok(None);
     }
 
-    let mqtt_opts = MqttOptions::new(
+    let mut mqtt_opts = MqttOptions::new(
         config.mqtt.client_id.clone(),
         config.mqtt.host.clone(),
         config.mqtt.port,
     );
+
+    if config.mqtt.homie.enabled {
+        mqtt_opts = mqtt_opts.set_last_will(homie::last_will(config));
+    }
 
     let (mut mqtt, notifications) =
         MqttClient::start(mqtt_opts).expect("Could not create MQTT connection");
@@ -73,6 +79,10 @@ pub fn init(
 
     if config.mqtt.homeassistant.enabled {
         sub_services.push(homeassistant::init(&config, &mut mqtt, sender)?);
+    }
+
+    if config.mqtt.homie.enabled {
+        sub_services.push(homie::init(&config, &mut mqtt, sender)?);
     }
 
     let (sender, receiver) = channel::unbounded();
@@ -99,7 +109,7 @@ pub fn init(
             },
         }
         if !r.load(Ordering::SeqCst) {
-            break
+            break;
         }
     });
 

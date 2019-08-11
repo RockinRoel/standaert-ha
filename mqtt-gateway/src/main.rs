@@ -139,7 +139,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 }
             }
         }
-        if last_package.is_some() && Instant::now() - last_package.unwrap() > Duration::from_secs(10) {
+        if last_package.is_some()
+            && Instant::now() - last_package.unwrap() > Duration::from_secs(10)
+        {
             sender.send(Command::new(CommandType::Refresh, 0)).unwrap();
         }
         if !running.load(Ordering::SeqCst) {
