@@ -2,10 +2,10 @@ use crossbeam::crossbeam_channel::unbounded;
 use log::{debug, error, info};
 use serialport::prelude::*;
 #[cfg(feature = "mqtt")]
-use standaertha_mqtt_gateway::mqtt;
+use standaertha_gateway::mqtt;
 #[cfg(feature = "webthing")]
-use standaertha_mqtt_gateway::webthing;
-use standaertha_mqtt_gateway::{
+use standaertha_gateway::webthing;
+use standaertha_gateway::{
     append_crc16, config, slip_encode, Command, CommandType, Package, PackageInputStream, Service,
 };
 use std::io::Read;

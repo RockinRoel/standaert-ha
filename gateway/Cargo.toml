@@ -1,5 +1,5 @@
 [package]
-name = "standaertha-mqtt-gateway"
+name = "standaertha-gateway"
 version = "0.1.0"
 authors = ["Roel Standaert <roel@abittechnical.com>"]
 edition = "2018"
