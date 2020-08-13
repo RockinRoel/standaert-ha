@@ -1,4 +1,4 @@
-#include "config.hpp"
+#include "dsl.hpp"
 
 // Configuration tests
 
