@@ -9,16 +9,6 @@
 #include "button_event.h"
 #include "command.h"
 
-#if defined(__GNUC__) && __GNUC__ < 6
-#define BUGGED_COMPILER
-#endif
-
-#ifdef BUGGED_COMPILER
-#define BUGGED_CONSTEXPR
-#else // !BUGGED_COMPILER
-#define BUGGED_CONSTEXPR constexpr
-#endif // !BUGGED_COMPILER
-
 namespace StandaertHA {
 
 class Config {
@@ -105,7 +95,64 @@ private:
   CommandSet<32> pressEnd_;
 };
 
-extern const Config config;
-extern void postprocess(uint32_t &output);
+namespace Impl {
+
+inline constexpr Config createConfig()
+{
+  const auto PressStart = ButtonEvent::Type::PressStart;
+  const auto Toggle = Command::Type::Toggle;
+
+  Config result;
+  result.on(PressStart, 0, Toggle, 4);
+  result.on(PressStart, 1, Toggle, 3);
+  result.on(PressStart, 2, Toggle, 24);
+  result.on(PressStart, 3, Toggle, 2);
+  result.on(PressStart, 4, Toggle, 0);
+  result.on(PressStart, 5, Toggle, 17);
+  result.on(PressStart, 6, Toggle, 20);
+  result.on(PressStart, 7, Toggle, 13);
+  result.on(PressStart, 8, Toggle, 16);
+  result.on(PressStart, 9, Toggle, 6);
+  result.on(PressStart, 11, Toggle, 25);
+  result.on(PressStart, 11, Toggle, 5);
+  result.on(PressStart, 12, Toggle, 7);
+  result.on(PressStart, 13, Toggle, 5);
+  result.on(PressStart, 13, Toggle, 25);
+  result.on(PressStart, 14, Toggle, 31);
+  result.on(PressStart, 15, Toggle, 20);
+  result.on(PressStart, 16, Toggle, 5);
+  result.on(PressStart, 16, Toggle, 25);
+  result.on(PressStart, 17, Toggle, 28);
+  result.on(PressStart, 17, Toggle, 29);
+  result.on(PressStart, 18, Toggle, 26);
+  result.on(PressStart, 19, Toggle, 11);
+  result.on(PressStart, 20, Toggle, 30);
+  result.on(PressStart, 21, Toggle, 8);
+  result.on(PressStart, 22, Toggle, 18);
+  result.on(PressStart, 23, Toggle, 14);
+  result.on(PressStart, 24, Toggle, 15);
+  result.on(PressStart, 25, Toggle, 15);
+  result.on(PressStart, 26, Toggle, 12);
+  result.on(PressStart, 27, Toggle, 27);
+  result.on(PressStart, 28, Toggle, 12);
+  result.on(PressStart, 29, Toggle, 10);
+  result.on(PressStart, 30, Toggle, 15);
+  result.on(PressStart, 31, Toggle, 23);
+  return result;
+}
+
+}
+
+constexpr Config config = Impl::createConfig();
+
+inline void postprocess(uint32_t &output)
+{
+  if (getBit(output, 20) == HIGH ||
+      getBit(output, 5) == HIGH) {
+    setBit(output, 22, HIGH);
+  } else {
+    setBit(output, 22, LOW);
+  }
+}
 
 } // StandaertHA

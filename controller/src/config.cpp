@@ -6,68 +6,7 @@ namespace StandaertHA {
 
 namespace {
 
-inline BUGGED_CONSTEXPR Config createConfig()
-{
-  const auto PressStart = ButtonEvent::Type::PressStart;
-  const auto Toggle = Command::Type::Toggle;
-
-  Config result;
-  result.on(PressStart, 0, Toggle, 4);
-  result.on(PressStart, 1, Toggle, 3);
-  result.on(PressStart, 2, Toggle, 24);
-  result.on(PressStart, 3, Toggle, 2);
-  result.on(PressStart, 4, Toggle, 0);
-  result.on(PressStart, 5, Toggle, 17);
-  result.on(PressStart, 6, Toggle, 20);
-  result.on(PressStart, 7, Toggle, 13);
-  result.on(PressStart, 8, Toggle, 16);
-  result.on(PressStart, 9, Toggle, 6);
-  result.on(PressStart, 11, Toggle, 25);
-  result.on(PressStart, 11, Toggle, 5);
-  result.on(PressStart, 12, Toggle, 7);  
-  result.on(PressStart, 13, Toggle, 5);
-  result.on(PressStart, 13, Toggle, 25);
-  result.on(PressStart, 14, Toggle, 31);
-  result.on(PressStart, 15, Toggle, 20);
-  result.on(PressStart, 16, Toggle, 5);
-  result.on(PressStart, 16, Toggle, 25);  
-  result.on(PressStart, 17, Toggle, 28);
-  result.on(PressStart, 17, Toggle, 29);  
-  result.on(PressStart, 18, Toggle, 26);
-  result.on(PressStart, 19, Toggle, 11);
-  result.on(PressStart, 20, Toggle, 30);
-  result.on(PressStart, 21, Toggle, 8);
-  result.on(PressStart, 22, Toggle, 18);
-  result.on(PressStart, 23, Toggle, 14);
-  result.on(PressStart, 24, Toggle, 15);
-  result.on(PressStart, 25, Toggle, 15);
-  result.on(PressStart, 26, Toggle, 12);
-  result.on(PressStart, 27, Toggle, 27);
-  result.on(PressStart, 28, Toggle, 12);
-  result.on(PressStart, 29, Toggle, 10);
-  result.on(PressStart, 30, Toggle, 15);
-  result.on(PressStart, 31, Toggle, 23);
-  return result;
-}
-
-}
-
-const Config config = createConfig();
-
-void postprocess(uint32_t &output) {
-  if (getBit(output, 20) == HIGH ||
-      getBit(output, 5) == HIGH) {
-    setBit(output, 22, HIGH);
-  } else {
-    setBit(output, 22, LOW);
-  }
-}
-
-#ifndef BUGGED_COMPILER
-
-namespace {
-
-constexpr const Config testConfig =
+constexpr Config testConfig =
   Config()
     .on(ButtonEvent::Type::PressStart, 0, Command::Type::Toggle, 31)
     .on(ButtonEvent::Type::PressStart, 1, Command::Type::Toggle, 30)
@@ -108,7 +47,5 @@ static_assert(testConfig.apply(0x00000000, ButtonEvent(31, ButtonEvent::Type::Pr
 static_assert(testConfig.apply(0x00000001, ButtonEvent(31, ButtonEvent::Type::PressStart)) == 0x00000000, "toggle last light off");
 
 } // anonymous namespace
-
-#endif // BUGGED_COMPILER
 
 } // StandaertHA
