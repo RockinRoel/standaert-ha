@@ -2,11 +2,11 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#include "button_event.h"
-#include "command.h"
-#include "config.h"
-#include "slip.h"
-#include "standaert_ha.h"
+#include "button_event.hpp"
+#include "command.hpp"
+#include "config.hpp"
+#include "slip.hpp"
+#include "standaert_ha.hpp"
 
 #include <util/crc16.h>
 

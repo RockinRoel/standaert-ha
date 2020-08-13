@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #endif // !STANDAERTHA_NATIVE
 
-#include "util.h"
+#include "util.hpp"
 
 namespace StandaertHA {
 

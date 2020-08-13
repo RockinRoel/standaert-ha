@@ -6,8 +6,8 @@
 #include <Arduino.h>
 #endif // !STANDAERTHA_NATIVE
 
-#include "button_event.h"
-#include "command.h"
+#include "button_event.hpp"
+#include "command.hpp"
 
 namespace StandaertHA {
 
