@@ -3,5 +3,8 @@
         "PATH": "/home/roel/.platformio/penv/bin:/home/roel/.platformio/penv:/home/roel/.cargo/bin:/home/roel/.cargo/bin:/home/roel/.local/bin:/home/roel/bin:/usr/lib64/ccache:/home/roel/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/var/lib/snapd/snap/bin:/snap/bin:/var/lib/snapd/snap/bin",
         "PLATFORMIO_CALLER": "vscode"
     },
-    "C_Cpp.intelliSenseEngineFallback": "Disabled"
+    "C_Cpp.intelliSenseEngineFallback": "Disabled",
+    "files.associations": {
+        "*.ipp": "cpp"
+    }
 }
