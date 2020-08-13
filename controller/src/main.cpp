@@ -5,8 +5,8 @@
 #include "button_event.hpp"
 #include "command.hpp"
 #include "config.hpp"
+#include "constants.hpp"
 #include "slip.hpp"
-#include "standaert_ha.hpp"
 
 #include <util/crc16.h>
 
