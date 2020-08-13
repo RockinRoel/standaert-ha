@@ -59,6 +59,14 @@ public:
     return ButtonEvent(data);
   }
 
+  constexpr bool operator==(const ButtonEvent &other) const {
+    return data_ == other.data_;
+  }
+
+  constexpr bool operator!=(const ButtonEvent &other) const {
+    return !operator==(other);
+  }
+
 private:
   constexpr explicit ButtonEvent(uint8_t data)
     : data_(data)

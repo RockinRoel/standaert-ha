@@ -184,7 +184,9 @@ void getButtonEvents(ButtonEvent * const events) {
 }
 
 void processEvent(const ButtonEvent &event) {
-  state.output = config.apply(state.output, event);
+  DSL::Context context(event, state.output);
+  handleEvent(context);
+  state.output = context.outputAfter();
 }
 
 void transmit(const ButtonEvent * const events) {
