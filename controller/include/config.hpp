@@ -1,10 +1,6 @@
 #pragma once
 
-#if STANDAERTHA_NATIVE
-#include <cstdint>
-#else // !STANDAERTHA_NATIVE
 #include <Arduino.h>
-#endif // !STANDAERTHA_NATIVE
 
 #include "dsl.hpp"
 

@@ -1,11 +1,6 @@
 #pragma once
 
-#if STANDAERTHA_NATIVE
-#include <cstddef>
-#include <cstdint>
-#else // !STANDAERTHA_NATIVE
 #include <Arduino.h>
-#endif // !STANDAERTHA_NATIVE
 
 namespace StandaertHA {
 
