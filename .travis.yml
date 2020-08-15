@@ -1,3 +1,0 @@
-dist: bionic
-language: rust
-before_script: cd mqtt-gateway
