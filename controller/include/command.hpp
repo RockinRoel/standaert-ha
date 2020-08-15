@@ -9,9 +9,9 @@ namespace StandaertHA {
 /**
  * Command, encoded as:
  * 
- * TT0IIIII
+ * TTTIIIII
  * 
- * TT: command type
+ * TTT: command type
  * IIIII: output id
  */
 class Command {
