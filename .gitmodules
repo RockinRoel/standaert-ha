@@ -1,0 +1,3 @@
+[submodule "home-assistant"]
+	path = home-assistant
+	url = git@gitlab.com:RockinRoel/standaert-ha-home-assistant-addon.git
