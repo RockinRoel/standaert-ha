@@ -1,0 +1,4 @@
+entity button_bedroom = input 0;
+entity light_bedroom = output 0;
+
+on redge button_bedroom toggle light_bedroom;

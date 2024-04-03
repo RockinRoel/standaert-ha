@@ -1,0 +1,21 @@
+[package]
+name = "sha_bridge"
+version = "0.1.0"
+edition = "2021"
+authors = ["Roel Standaert <roel@arres.be>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+rumqttc = "0.24"
+tokio-serial = "5.4"
+pest = "2.7"
+pest_derive = "2.7"
+static_assertions = "1.1"
+clap = { version = "4.5", features = ["derive", "env"] }
+anyhow = { version = "1.0", features = ["backtrace"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+slip-codec = { version = "0.4", features = ["tokio-codec"] }
+futures = "0.3"
+crc = "3.0"

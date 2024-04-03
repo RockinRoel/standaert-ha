@@ -1,0 +1,136 @@
+program = { SOI ~ entity_declaration* ~ top_level_statement* ~ EOI }
+
+entity_declaration = {
+    input_declaration ~ ";"
+  | output_declaration ~ ";"
+}
+
+input_declaration = {
+    kw_entity ~ entity_id ~ "=" ~ input
+}
+
+output_declaration = {
+    kw_entity ~ entity_id ~ "=" ~ output
+}
+
+top_level_statement = {
+    action ~ ";"
+  | condition_block
+  | event_block
+}
+
+statement = {
+    action ~ ";"
+  | condition_block
+}
+
+action = {
+    toggle_action
+  | set_action
+}
+
+toggle_action = {
+    kw_toggle ~ output
+  | kw_toggle ~ entity_id
+}
+
+set_action = {
+    kw_set ~ output ~ value
+  | kw_set ~ entity_id ~ value
+}
+
+input  = { kw_input ~ number }
+output = { kw_output ~ number }
+
+value = {
+    kw_low
+  | kw_high
+}
+
+condition_block = { if_block ~ else_block? }
+
+if_block = { kw_if ~ condition ~ "{" ~ statement* ~ "}" }
+
+else_block = {
+    kw_else ~ condition_block
+  | kw_else ~ "{" ~ statement* ~ "}"
+}
+
+condition = {
+    lcondition ~ (boolean_operator ~ condition)?
+}
+
+boolean_operator = {
+    kw_and
+  | kw_or
+  | kw_xor
+}
+
+lcondition = {
+    "(" ~ condition ~ ")"
+  | input_condition
+  | output_condition
+  | not_condition
+  | entity_condition
+}
+
+input_condition = {
+    input ~ tspec ~ value
+}
+
+output_condition = {
+    output ~ tspec ~ value
+}
+
+not_condition = {
+    kw_not ~ lcondition
+}
+
+entity_condition = {
+    entity_id ~ tspec ~ value
+}
+
+tspec = {
+    kw_is
+  | kw_was
+}
+
+event_block = {
+    kw_on ~ event ~ "{" ~ statement* ~ "}"
+  | kw_on ~ event ~ action ~ ";"
+}
+
+event = {
+    edge ~ input
+  | edge ~ entity_id
+}
+
+edge = {
+    kw_redge
+  | kw_fedge
+}
+
+kw_if     = _{ "if" }
+kw_else   = _{ "else" }
+kw_on     = _{ "on" }
+kw_redge  = _{ "redge" }
+kw_fedge  = _{ "fedge" }
+kw_and    = _{ "and" }
+kw_or     = _{ "or" }
+kw_xor    = _{ "xor" }
+kw_not    = _{ "not" }
+kw_toggle = _{ "toggle" }
+kw_set    = _{ "set" }
+kw_input  = _{ "input" }
+kw_output = _{ "output" }
+kw_entity = _{ "entity" }
+kw_high   = _{ "high" }
+kw_low    = _{ "low" }
+kw_is     = _{ "is" }
+kw_was    = _{ "was" }
+
+entity_id = @{ ASCII_ALPHA ~ ("_" | ASCII_ALPHANUMERIC)* }
+number    = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+
+COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
