@@ -8,7 +8,7 @@
 
 ## Serial configuration
 
-- baudrate: 9600 baud
+- baudrate: 115200 baud
 - 8-N-1:
   - 8 data bits
   - no parity bit

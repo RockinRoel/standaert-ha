@@ -17,7 +17,7 @@
 
 #include <Arduino.h>
 
-namespace StandaertHA {
+namespace StandaertHA::Comm {
 
   /**
    * ButtonEvent, encoded as:
@@ -40,46 +40,46 @@ namespace StandaertHA {
       PressEnd   = 0x80
     };
 
-    constexpr ButtonEvent()
+    constexpr ButtonEvent() noexcept
       : data_(0)
     { }
 
-    constexpr explicit ButtonEvent(uint8_t button, Type type)
+    constexpr explicit ButtonEvent(uint8_t button, Type type) noexcept
       : data_(static_cast<uint8_t>(type) | // type
               (button & 0x1F) | // button id
               0x40) // valid
     { }
 
-    constexpr bool valid() const {
+    constexpr bool valid() const noexcept {
       return data_ & 0x40;
     }
 
-    constexpr Type type() const {
+    [[nodiscard]] constexpr Type type() const noexcept {
       return static_cast<Type>(data_ & 0x80);
     }
 
-    constexpr uint8_t button() const {
+    [[nodiscard]] constexpr uint8_t button() const noexcept {
       return data_ & 0x1F;
     }
 
-    constexpr uint8_t raw() const {
+    [[nodiscard]] constexpr uint8_t raw() const noexcept {
       return data_;
     }
 
-    static constexpr ButtonEvent fromRaw(uint8_t data) {
+    [[nodiscard]] static constexpr ButtonEvent from_raw(uint8_t data) noexcept {
       return ButtonEvent(data);
     }
 
-    constexpr bool operator==(const ButtonEvent &other) const {
+    [[nodiscard]] constexpr bool operator==(const ButtonEvent& other) const noexcept {
       return data_ == other.data_;
     }
 
-    constexpr bool operator!=(const ButtonEvent &other) const {
+    [[nodiscard]] constexpr bool operator!=(const ButtonEvent& other) const noexcept {
       return !operator==(other);
     }
 
   private:
-    constexpr explicit ButtonEvent(uint8_t data)
+    constexpr explicit ButtonEvent(uint8_t data) noexcept
       : data_(data)
     { }
 
@@ -88,4 +88,4 @@ namespace StandaertHA {
 
   static_assert(sizeof(ButtonEvent) == 1);
 
-} // StandaertHA
+} // StandaertHA::Comm

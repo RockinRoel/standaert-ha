@@ -15,19 +15,15 @@
 
 #pragma once
 
-namespace StandaertHA {
+namespace StandaertHA::Util::Pred {
 
-  constexpr inline int getBit(const uint32_t i, const uint8_t bit) {
-    return ((i >> bit) & 1) ? HIGH : LOW;
+  constexpr bool all_different() noexcept {
+    return true;
   }
 
-  constexpr inline void setBit(uint32_t &i, const uint8_t bit, int v) {
-    uint32_t mask = ((uint32_t)1) << bit;
-    if (v == HIGH) {
-      i = i | mask;
-    } else {
-      i = i & ~mask;
-    }
+  template<typename T, typename... Types>
+  constexpr bool all_different(T&& head, Types&&... tail) noexcept {
+    return ((head != tail) && ...) && all_different(tail...);
   }
 
-}
+} // StandaertHA::Util

@@ -38,12 +38,12 @@ namespace StandaertHA::Shal::Bytecode {
   constexpr uint8_t INSTR_XOR          = 0b0000'0011U;
   constexpr uint8_t INSTR_NOT          = 0b0000'0100U;
   constexpr uint8_t INSTR_POP          = 0b0000'0101U;
-  
+
   constexpr uint8_t INSTR_SET          = 0b0000'0000U;
   constexpr uint8_t INSTR_TOGGLE       = 0b0000'0010U;
   constexpr uint8_t INSTR_ON           = 0b0000'0100U;
   constexpr uint8_t INSTR_IF           = 0b0000'1000U;
-  
+
   constexpr uint8_t INSTR_SET_MASK     = DUAL_BYTE_MASK & ~SET_VALUE_MASK;
   constexpr uint8_t INSTR_TOGGLE_MASK  = DUAL_BYTE_MASK;
   constexpr uint8_t INSTR_ON_MASK      = DUAL_BYTE_MASK & ~ON_EDGE_MASK;
@@ -54,20 +54,20 @@ namespace StandaertHA::Shal::Bytecode {
   static_assert(INSTR_ON_MASK     == 0b0011'1110U);
   static_assert(INSTR_IF_MASK     == 0b0011'1000U);
 
-  constexpr bool isSingleByte(uint8_t byte) {
-    return (byte & 0b1000'0000) == 0;
+  constexpr bool is_single_byte(uint8_t byte) {
+    return (byte & FIRST_BYTE_PREFIX) == 0;
   }
 
-  constexpr bool isDualByte(uint8_t byte) {
-    return (byte & 0b1000'0000) != 0;
+  constexpr bool is_dual_byte(uint8_t byte) {
+    return (byte & FIRST_BYTE_PREFIX) != 0;
   }
 
-  constexpr bool isFirstByte(uint8_t byte) {
-    return isDualByte(byte) && (byte & 0b0100'0000) == 0;
+  constexpr bool is_first_byte(uint8_t byte) {
+    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) == 0;
   }
 
-  constexpr bool isSecondByte(uint8_t byte) {
-    return isDualByte(byte) && (byte & 0b0100'0000) != 0;
+  constexpr bool is_second_byte(uint8_t byte) {
+    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) != 0;
   }
 
 }

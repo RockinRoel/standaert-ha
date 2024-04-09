@@ -15,7 +15,8 @@
 
 #pragma once
 
-namespace StandaertHA {
+namespace StandaertHA::Constants {
+
     constexpr const int MODE_PIN = 10;
     constexpr const int MSB_PIN = 11;
     constexpr const int RST_IN1_PIN = 6;
@@ -52,4 +53,7 @@ namespace StandaertHA {
     constexpr const int MCP23017_OLATB = 0x15;
 
     constexpr const unsigned long int DEBOUNCE_TIME_MILLIS = 30UL;
-}
+
+    constexpr const unsigned long int SERIAL_BAUD_RATE = 115'200UL;
+
+} // StandaertHA::Constants

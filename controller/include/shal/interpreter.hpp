@@ -16,134 +16,35 @@
 #pragma once
 
 #include "bytecode.hpp"
-#include "inet.hpp"
+
+#include "collections/bitstack32.hpp"
+#include "collections/bitset32.hpp"
+#include "util/inet.hpp"
 
 #include <Arduino.h>
 #include <EEPROM.h>
 
 namespace StandaertHA::Shal::Interpreter {
-  class FixedBitSet {
-  private:
-    uint32_t set_;
-
-  public:
-    constexpr FixedBitSet() noexcept
-      : set_(UINT32_C(0))
-    { }
-
-    constexpr explicit FixedBitSet(uint32_t value) noexcept
-      : set_(value)
-    { }
-
-    constexpr FixedBitSet(const FixedBitSet& other) noexcept = default;
-
-    constexpr FixedBitSet& operator=(const FixedBitSet& other) noexcept = default;
-
-    FixedBitSet(FixedBitSet&&) = delete;
-    FixedBitSet& operator=(FixedBitSet&&) = delete;
-
-    constexpr void set(uint8_t bit, bool value) noexcept
-    {
-      if (value) {
-        set_ |= (UINT32_C(1) << bit);
-      } else {
-        set_ &= ~(UINT32_C(1) << bit);
-      }
-    }
-
-    [[nodiscard]] constexpr bool get(uint8_t bit) const noexcept
-    {
-      return (set_ & (UINT32_C(1) << bit)) != UINT32_C(0);
-    }
-
-    constexpr void clear() noexcept
-    {
-      set_ = UINT32_C(0);
-    }
-
-    [[nodiscard]] constexpr uint32_t value() const noexcept
-    {
-      return set_;
-    }
-  };
-
-  class BitStack {
-  private:
-    uint32_t stack_;
-    uint8_t stackDepth_;
-
-  public:
-    constexpr BitStack() noexcept
-      : stack_(UINT32_C(0)),
-        stackDepth_(UINT32_C(0))
-    { }
-
-    constexpr explicit BitStack(uint32_t value, uint8_t stackDepth) noexcept
-      : stack_(value),
-        stackDepth_(stackDepth)
-    { }
-
-    constexpr BitStack(const BitStack& other) noexcept = default;
-
-    constexpr BitStack& operator=(const BitStack& other) noexcept = default;
-
-    BitStack(BitStack&&) = delete;
-    BitStack& operator=(BitStack&&) = delete;
-
-    constexpr void push(bool value) noexcept
-    {
-      if (value) {
-        stack_ |= UINT32_C(1) << stackDepth_;
-      } else {
-        stack_ &= ~(UINT32_C(1) << stackDepth_);
-      }
-      ++stackDepth_;
-    }
-
-    constexpr bool pop() noexcept
-    {
-      const auto result = peek();
-      --stackDepth_;
-      return result;
-    }
-
-    [[nodiscard]] constexpr bool peek() const noexcept
-    {
-      return (stack_ & (UINT32_C(1) << (stackDepth_ - 1))) != UINT32_C(0);
-    }
-
-    [[nodiscard]] constexpr bool all_one() const noexcept
-    {
-      if (stackDepth_ == 0) {
-        return true;
-      }
-      const uint32_t mask = UINT32_C(0xFFFF'FFFF) >> (32 - stackDepth_);
-      return (stack_ & mask) == mask;
-    }
-  };
-
-  static_assert(BitStack().all_one());
-  static_assert(BitStack(UINT32_C(0xFFFF'FFFF), 32).all_one());
-  static_assert(BitStack(UINT32_C(0x0000'0003), 2).all_one());
-  static_assert(BitStack(UINT32_C(0x0000'0003), 1).all_one());
-  static_assert(!BitStack(UINT32_C(0x0000'0003), 3).all_one());
 
   class VmState {
   private:
-    const FixedBitSet& inputOld_;
-    const FixedBitSet& inputNew_;
-    const FixedBitSet& outputOld_;
-    FixedBitSet outputNew_;
-    BitStack stack_;
+    using BitSet32 = Collections::BitSet32;
+    using BitStack32 = Collections::BitStack32;
+
+    const BitSet32& old_input_;
+    const BitSet32& new_input_;
+    const BitSet32& old_output_;
+    BitSet32 new_output_;
+    BitStack32 stack_;
 
   public:
-    VmState(const FixedBitSet& inputOld,
-            const FixedBitSet& inputNew,
-            const FixedBitSet& outputOld)
-      : inputOld_(inputOld),
-        inputNew_(inputNew),
-        outputOld_(outputOld),
-        outputNew_(outputOld)
+    VmState(const BitSet32& old_input,
+            const BitSet32& new_input,
+            const BitSet32& old_output)
+      : old_input_(old_input),
+        new_input_(new_input),
+        old_output_(old_output),
+        new_output_(old_output)
     { }
 
     VmState(const VmState&) = delete;
@@ -151,16 +52,19 @@ namespace StandaertHA::Shal::Interpreter {
     VmState(VmState&&) = delete;
     VmState& operator=(VmState&&) = delete;
 
+    const BitSet32& new_output() const
+    {
+      return new_output_;
+    }
+
     friend class Program;
-    friend void ::loop();
   };
 
   // Max program size is 256 bytes
-  constexpr uint16_t PROGRAM_SIZE = 256;
 #ifndef EEPROM_SIZE
 #define EEPROM_SIZE (E2END + 1)
 #endif
-  static_assert(EEPROM_SIZE >= PROGRAM_SIZE);
+  constexpr uint16_t PROGRAM_SIZE = EEPROM_SIZE < 1024 ? EEPROM_SIZE : 1024;
 
   class ProgramHeader {
   public:
@@ -178,13 +82,13 @@ namespace StandaertHA::Shal::Interpreter {
     }
 
     explicit ProgramHeader(uint16_t length, uint16_t crc)
-      : length_(htons(length)),
-        crc_(htons(crc))
+      : length_(Util::Inet::htons(length)),
+        crc_(Util::Inet::htons(crc))
     {}
 
     [[nodiscard]] const Magic& magic() const { return magic_; }
-    [[nodiscard]] uint16_t length() const { return ntohs(length_); }
-    [[nodiscard]] uint16_t crc() const { return ntohs(crc_); }
+    [[nodiscard]] uint16_t length() const { return Util::Inet::ntohs(length_); }
+    [[nodiscard]] uint16_t crc() const { return Util::Inet::ntohs(crc_); }
 
   private:
     Magic magic_ = {'S', 'H', 'A', 'L'};
@@ -258,4 +162,5 @@ namespace StandaertHA::Shal::Interpreter {
   };
 
   static_assert(sizeof(Program) == PROGRAM_SIZE);
-}
+
+} // StandaertHA::SHAL::Interpreter

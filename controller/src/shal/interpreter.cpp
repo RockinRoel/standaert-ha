@@ -118,11 +118,11 @@ namespace StandaertHA::Shal::Interpreter {
   bool Program::cycle(VmState& state) const
   {
     using namespace Bytecode;
-    state.outputNew_ = state.outputOld_;
+    state.new_output_ = state.old_output_;
     uint8_t prevByte = INSTR_END;
     for (uint16_t i = UINT16_C(0); i < header_.length(); ++i) {
       uint8_t byte = code_[i];
-      if (isSingleByte(byte)) {
+      if (is_single_byte(byte)) {
         switch (byte & SINGLE_BYTE_MASK) {
         case INSTR_END:
           // DONE
@@ -143,14 +143,12 @@ namespace StandaertHA::Shal::Interpreter {
           instrPop(state);
           break;
         default:
-          // TODO(Roel): UNKNOWN INSTRUCTION, ABORT WITH ERROR
-          state.outputNew_ = state.outputOld_;
+          state.new_output_ = state.old_output_;
           return false;
         }
-      } else if (isSecondByte(byte)) {
-        if (!isFirstByte(prevByte)) {
-          // TODO(Roel): BYTECODE ERROR, ABORT WITH ERROR
-          state.outputNew_ = state.outputOld_;
+      } else if (is_second_byte(byte)) {
+        if (!is_first_byte(prevByte)) {
+          state.new_output_ = state.old_output_;
           return false;
         }
         const uint8_t value = byte & DUAL_BYTE_MASK;
@@ -181,19 +179,16 @@ namespace StandaertHA::Shal::Interpreter {
             (instr & IF_VALUE_MASK) != 0 ? Value::High : Value::Low
           );
         } else {
-          // TODO(Roel): UNKNOWN INSTRUCTION, ABORT WITH ERROR
-          state.outputNew_ = state.outputOld_;
+          state.new_output_ = state.old_output_;
           return false;
         }
-      } else if (!isFirstByte(byte)) {
-        // TODO(Roel): ERROR, ABORT WITH ERROR
-        state.outputNew_ = state.outputOld_;
+      } else if (!is_first_byte(byte)) {
+        state.new_output_ = state.old_output_;
         return false;
       }
       prevByte = byte;
     }
-    // TODO(Roel): ERROR, PROGRAM DIDN'T END WITH END INSTRUCTION
-    state.outputNew_ = state.outputOld_;
+    state.new_output_ = state.old_output_;
     return false;
   }
 
@@ -234,7 +229,7 @@ namespace StandaertHA::Shal::Interpreter {
     if (!state.stack_.all_one()) {
       return;
     }
-    state.outputNew_.set(output, value == Value::High);
+    state.new_output_.set(output, value == Value::High);
   }
 
   void Program::instrToggle(VmState& state, uint8_t output) const
@@ -242,20 +237,20 @@ namespace StandaertHA::Shal::Interpreter {
     if (!state.stack_.all_one()) {
       return;
     }
-    auto old = state.outputNew_.get(output);
-    state.outputNew_.set(output, !old);
+    auto old = state.new_output_.get(output);
+    state.new_output_.set(output, !old);
   }
 
   void Program::instrOn(VmState& state, Edge edge, uint8_t input) const
   {
     switch (edge) {
     case Edge::Falling: {
-      auto b = state.inputOld_.get(input) && !state.inputNew_.get(input);
+      auto b = state.old_input_.get(input) && !state.new_input_.get(input);
       state.stack_.push(b);
       break;
     }
     case Edge::Rising: {
-      auto b = !state.inputOld_.get(input) && state.inputNew_.get(input);
+      auto b = !state.old_input_.get(input) && state.new_input_.get(input);
       state.stack_.push(b);
       break;
     }
@@ -266,21 +261,21 @@ namespace StandaertHA::Shal::Interpreter {
 
   void Program::instrIf(VmState& state, InOut inOut, IsWas isWas, uint8_t n, Value value) const
   {
-    const FixedBitSet* set = nullptr;
+    const Collections::BitSet32* set = nullptr;
     if (inOut == InOut::Input) {
       if (isWas == IsWas::Was) {
-        set = &state.inputOld_;
+        set = &state.old_input_;
       } else {
         // isWas == IsWas::Is
-        set = &state.inputNew_;
+        set = &state.new_input_;
       }
     } else {
       // inOut == InOut::Output
       if (isWas == IsWas::Was) {
-        set = &state.outputOld_;
+        set = &state.old_output_;
       } else {
         // isWas == IsWas::Is
-        set = &state.outputNew_;
+        set = &state.new_output_;
       }
     }
     if (value == Value::Low) {
