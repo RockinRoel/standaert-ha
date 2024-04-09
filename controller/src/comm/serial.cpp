@@ -81,7 +81,7 @@ namespace StandaertHA::Comm::Serial {
     Comm::FailMsg fail_msg;
     size_t i = 0;
     for (; i < size && i < sizeof(fail_msg.message); ++i) {
-      fail_msg.message[i] = error_message[i];
+      fail_msg.message[i] = pgm_read_byte_near(error_message + i);
     }
 
     Comm::Message message(fail_msg, i);
