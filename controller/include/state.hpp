@@ -89,24 +89,6 @@ namespace StandaertHA {
       uint16_t position = 0;
     } upload_state;
 
-    struct Error {
-      const char* message = nullptr;
-      size_t size = 0;
-
-      template<size_t size>
-      void set_error(const char (&error_message)[size])
-      {
-        message = error_message;
-        this->size = size - 1;
-      }
-
-      void reset_error()
-      {
-        message = nullptr;
-        size = 0;
-      }
-    } error;
-
     Comm::Message message;
 
     Shal::Interpreter::Program program;

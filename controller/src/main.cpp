@@ -14,6 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "constants.hpp"
+#include "errors.hpp"
 #include "state.hpp"
 
 #include "collections/bitset32.hpp"
@@ -139,11 +140,11 @@ namespace StandaertHA {
         uint32_t new_size = static_cast<uint32_t>(state.upload_state.position) + static_cast<uint32_t>(state.message.body_length());
         bool size_error = false;
         if (new_size > static_cast<uint32_t>(Shal::Interpreter::MAX_CODE_SIZE)) {
-//          state.error.set_error("Maximum code size exceeded!");
+          Comm::Serial::send_error(Errors::MAXIMUM_CODE_SIZE_ERROR);
           size_error = true;
         }
         if (!size_error && new_size > static_cast<uint32_t>(state.program.header().length())) {
-//          state.error.set_error("Program size exceeds length declared in program header");
+          Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
           size_error = true;
         }
         if (size_error) {
@@ -162,10 +163,14 @@ namespace StandaertHA {
           // Upload done
           state.upload_state.uploading = false;
           state.upload_state.position = 0;
-          if (new_size != static_cast<uint32_t>(state.program.header().length()) ||
-              !state.program.verify()) {
+          if (new_size != static_cast<uint32_t>(state.program.header().length())) {
+            Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
+            state.program.load();
+            return;
+          }
+          if (!state.program.verify()) {
             // Error: reload from EEPROM
-//            state.error.set_error("Program verification failed");
+            Comm::Serial::send_error(Errors::PROGRAM_VERIFICATION_ERROR);
             state.program.load();
             return;
           }
@@ -215,7 +220,7 @@ namespace StandaertHA {
     return success;
   }
 
-  void update_outputs(State& state, const Collections::BitSet32& output_before) {
+  void update_outputs(const State& state, const Collections::BitSet32& output_before) {
     if (state.output != output_before) {
       HAL::IO::write_outputs(state.output);
     }
@@ -289,10 +294,6 @@ void loop() {
 
   recv_message(state);
   handle_message(state);
-  if (state.error.message != nullptr) {
-    Comm::Serial::send_error(state.error.message, state.error.size);
-    state.error.reset_error();
-  }
   update_inputs(state);
   bool success = run_program(state);
   digitalWrite(LED_BUILTIN, success ? LOW : HIGH);
