@@ -26,6 +26,10 @@ message type:
   and input events)
 - `c`: Command message (host to controller, contains commands from
   the host for the controller)
+- `F`: Failure message (controller to host, contains a UTF-8 encoded
+  error message)
+- `I`: Info message (controller to host, contains a UTF-8 encoded
+  info message)
 - `s`: Program start (host to controller, indicates that the
   host wants to upload a new SHAL bytecode program to the controller)
 - `S`: Program start ack (controller to host, acknowledges that
@@ -40,6 +44,8 @@ message type:
 All invalid messages, including partial messages,
 messages with an incorrect CRC, or unrecognized message types
 will be ignored.
+
+A message type of `00` (the null byte) is not used.
 
 The maximum message size (including 3-byte header) is 128 bytes.
 
@@ -80,19 +86,22 @@ TTT: event type
 IIIII: input id
 
 e.g.
-00000010 : third input (input id 2, counting from 0) falling edge
-10000010 : third input (input id 2, counting from 0) rising edge
+00100010 : third input (input id 2, counting from 0) falling edge
+01100010 : third input (input id 2, counting from 0) rising edge
 ```
 
-The type (`T`) bits indicate falling edge (`000`) or rising edge
-(`100`). The 5 least significant bits indicate the input id.
+The type (`T`) bits indicate falling edge (`001`) or rising edge
+(`011`). The 5 least significant bits indicate the input id.
 `00000` is input 1, `00001` is input 2, and so on.
 Note that on the board input 1 is the leftmost input.
 
+Type `000` is not used (this is so that zeroed out memory can not
+interpreted as an event).
+
 Examples:
 
-- `00000010`: third input (input id 2) falling edge
-- `10000101`: sixth input (input id 5) rising edge
+- `00100010`: third input (input id 2) falling edge
+- `01100101`: sixth input (input id 5) rising edge
 
 ### Program start ack
 
@@ -150,6 +159,9 @@ The command type can be:
 - `010`: **Toggle** the output with the given id.
 - `100`: **Off**: sets the output with the given id to `LOW`.
 - `110`: **On**: sets the output with the given id to `HIGH`.
+
+Type `000` is not used (this is so that zeroed out memory can not
+interpreted as a command).
 
 The remaining values (`011`, `101`, and `111`) currently have no
 function and are ignored by the controller.
