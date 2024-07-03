@@ -3,23 +3,33 @@ use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
+use thiserror::Error;
 
 #[derive(Parser)]
 #[grammar = "shal/shal.pest"]
 struct ShalParser;
 
-pub(crate) fn parse(input: &str) -> Program {
-    let pest_program = ShalParser::parse(Rule::program, input)
-        .unwrap()
-        .next()
-        .unwrap()
-        .into_inner();
+#[derive(Error, Debug, PartialEq)]
+pub enum ParseError {
+    #[error("Failed to parse input")]
+    PestParseError(#[from] pest::error::Error<Rule>),
+}
+
+pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
+    let pest_program = ShalParser::parse(Rule::program, input)?.next();
+
     let mut program = Program {
         declarations: vec![],
         statements: vec![],
     };
 
-    for pair in pest_program {
+    if pest_program.is_none() {
+        // TODO(Roel): should this ever happen?
+        return Ok(program);
+    }
+    let pest_program = pest_program.unwrap();
+
+    for pair in pest_program.into_inner() {
         match pair.as_rule() {
             Rule::entity_declaration => {
                 program.declarations.push(handle_entity_declaration(pair));
@@ -31,7 +41,7 @@ pub(crate) fn parse(input: &str) -> Program {
         }
     }
 
-    program
+    Ok(program)
 }
 
 fn handle_entity_declaration(pair: Pair<Rule>) -> Declaration {
@@ -319,74 +329,74 @@ mod tests {
     fn test_parse() {
         assert_eq!(
             &parse("entity button = input 12;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![Declaration::Input {
                     entity_id: "button".to_string(),
                     number: 12,
                 }],
                 statements: vec![],
-            }
+            })
         );
         assert_eq!(
             &parse("entity light = output 5;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![Declaration::Output {
                     entity_id: "light".to_string(),
                     number: 5,
                 }],
                 statements: vec![],
-            }
+            })
         );
         assert_eq!(
             &parse("toggle output 1;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Action(Action::Toggle(Output::Number(1)),)],
-            }
+            })
         );
         assert_eq!(
             &parse("toggle light_downstairs;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Action(Action::Toggle(Output::Entity(
                     "light_downstairs".to_string()
                 )))],
-            }
+            })
         );
         assert_eq!(
             &parse("set output 3 high;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Action(Action::Set(
                     Output::Number(3),
                     Value::High
                 ))],
-            }
+            })
         );
         assert_eq!(
             &parse("set light_upstairs low;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Action(Action::Set(
                     Output::Entity("light_upstairs".to_string()),
                     Value::Low
                 ))],
-            }
+            })
         );
         assert_eq!(
             &parse("on redge input 3 toggle output 4;"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Event {
                     edge: common::Edge::Rising,
                     input: Input::Number(3),
                     statements: vec![Statement::Action(Action::Toggle(Output::Number(4))),],
                 },]
-            }
+            })
         );
         assert_eq!(
             &parse("on fedge input 5 { toggle output 4; set output 6 high; }"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::Event {
                     edge: common::Edge::Falling,
@@ -396,11 +406,11 @@ mod tests {
                         Statement::Action(Action::Set(Output::Number(6), Value::High,)),
                     ],
                 },]
-            }
+            })
         );
         assert_eq!(
             &parse("if input 4 is low xor light_upstairs was high {} else { toggle output 4; }"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::IfElse(
                     Condition::Xor(
@@ -414,11 +424,11 @@ mod tests {
                     vec![],
                     vec![Statement::Action(Action::Toggle(Output::Number(4))),],
                 )],
-            }
+            })
         );
         assert_eq!(
             &parse("if output 5 is high or output 20 is high {}"),
-            &Program {
+            &Ok(Program {
                 declarations: vec![],
                 statements: vec![Statement::IfElse(
                     Condition::Or(
@@ -432,11 +442,9 @@ mod tests {
                     vec![],
                     vec![],
                 )],
-            }
+            })
         );
-        assert!(matches!(
-            &parse(include_str!("../../static/standaertha.shal")),
-            &Program { .. }
-        ));
+        let parse_result = parse(include_str!("../../static/standaertha.shal"));
+        assert!(matches!(&parse_result, &Ok(Program { .. })));
     }
 }

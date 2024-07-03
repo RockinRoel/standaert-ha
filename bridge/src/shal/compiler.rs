@@ -1,38 +1,45 @@
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
+use crate::shal::compiler::CompileError::{DuplicateEntityError, UnknownEntityError};
 use crate::shal::compiler::InOut::{Input, Output};
 use crate::shal::{ast, bytecode};
 use std::collections::HashMap;
+use std::fmt::Display;
+use thiserror::Error;
 
 enum InOut {
     Input(u8),
     Output(u8),
 }
 
-#[derive(Debug)]
-struct DuplicateEntityError {
-    name: String,
-    first_loc: Option<ast::SourceLoc>,
-    second_loc: Option<ast::SourceLoc>,
-}
-
-#[derive(Debug)]
-struct EntityLookupFailure {
-    name: String,
+#[derive(Error, Debug, PartialEq)]
+pub enum CompileError {
+    #[error("Duplicate entity")]
+    DuplicateEntityError {
+        name: String,
+        first_loc: Option<ast::SourceLoc>,
+        second_loc: Option<ast::SourceLoc>,
+    },
+    #[error("Unknown entity")]
+    UnknownEntityError {
+        name: String,
+        location: Option<ast::SourceLoc>,
+    },
 }
 
 fn retrieve_input(
     entities: &HashMap<String, InOut>,
     input: &ast::Input,
-) -> Result<u8, EntityLookupFailure> {
+) -> Result<u8, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
             if let Some(Input(number)) = entities.get(entity_id) {
                 Ok(*number)
             } else {
-                Err(EntityLookupFailure {
+                Err(UnknownEntityError {
                     name: entity_id.clone(),
+                    location: None,
                 })
             }
         }
@@ -42,15 +49,16 @@ fn retrieve_input(
 fn retrieve_output(
     entities: &HashMap<String, InOut>,
     output: &ast::Output,
-) -> Result<u8, EntityLookupFailure> {
+) -> Result<u8, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
             if let Some(Output(number)) = entities.get(entity_id) {
                 Ok(*number)
             } else {
-                Err(EntityLookupFailure {
+                Err(UnknownEntityError {
                     name: entity_id.clone(),
+                    location: None,
                 })
             }
         }
@@ -60,19 +68,20 @@ fn retrieve_output(
 fn retrieve_entity(
     entities: &HashMap<String, InOut>,
     entity: &str,
-) -> Result<(u8, bytecode::InOut), EntityLookupFailure> {
+) -> Result<(u8, bytecode::InOut), CompileError> {
     match entities.get(entity) {
         Some(Input(number)) => Ok((*number, bytecode::InOut::Input)),
         Some(Output(number)) => Ok((*number, bytecode::InOut::Output)),
-        _ => Err(EntityLookupFailure {
+        _ => Err(UnknownEntityError {
             name: entity.to_string(),
+            location: None,
         }),
     }
 }
 
 fn collect_entities(
     declarations: &[ast::Declaration],
-) -> Result<HashMap<String, InOut>, DuplicateEntityError> {
+) -> Result<HashMap<String, InOut>, CompileError> {
     let mut result = HashMap::new();
     for declaration in declarations.iter() {
         match declaration {
@@ -103,8 +112,8 @@ fn collect_entities(
     Ok(result)
 }
 
-pub(crate) fn compile(ast_program: &ast::Program) -> bytecode::Program {
-    let entities = collect_entities(&ast_program.declarations).unwrap();
+pub(crate) fn compile(ast_program: &ast::Program) -> Result<bytecode::Program, CompileError> {
+    let entities = collect_entities(&ast_program.declarations)?;
     let mut bytecode_program = bytecode::Program {
         instructions: vec![],
         source_locations: vec![],
@@ -113,7 +122,7 @@ pub(crate) fn compile(ast_program: &ast::Program) -> bytecode::Program {
         handle_statement(&mut bytecode_program, &entities, statement);
     }
     bytecode_program.instructions.push(Instruction::End);
-    bytecode_program
+    Ok(bytecode_program)
 }
 
 fn handle_statement(
@@ -326,7 +335,7 @@ mod tests {
         let bytecode_program = compile(&ast_program);
 
         assert_eq!(
-            &bytecode::Program {
+            &Ok(bytecode::Program {
                 instructions: vec![
                     Instruction::On {
                         input: 0,
@@ -366,7 +375,7 @@ mod tests {
                     Instruction::End,
                 ],
                 source_locations: vec![],
-            },
+            }),
             &bytecode_program
         );
     }

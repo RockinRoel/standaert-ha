@@ -1,12 +1,43 @@
 use static_assertions as sa;
 
+use crate::controller::event::{Event, EventDecodeError};
+use crate::controller::command::{Command, CommandDecodeError};
+use crate::controller::message::MessageDecodingError::{CrcError, SizeTooLarge, SizeTooSmall, UnknownType};
+use crate::controller::program_header::{ProgramHeader, ProgramHeaderDecodeError};
 use crc::{Crc, CRC_16_XMODEM};
-use crate::controller::button_event::ButtonEvent;
-use crate::controller::command::Command;
-use crate::controller::program_header::ProgramHeader;
+use thiserror::Error;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MessageDecodingError;
+const MESSAGE_HEADER_LENGTH: usize = 3;
+const MIN_MESSAGE_LENGTH: usize = MESSAGE_HEADER_LENGTH;
+const MAX_MESSAGE_LENGTH: usize = 128;
+const MAX_MESSAGE_BODY_LENGTH: usize = MAX_MESSAGE_LENGTH - MESSAGE_HEADER_LENGTH;
+
+sa::const_assert_eq!(MIN_MESSAGE_LENGTH, 3);
+sa::const_assert_eq!(MAX_MESSAGE_BODY_LENGTH, 125);
+
+#[derive(Error, Debug, Eq, PartialEq)]
+pub(crate) enum MessageDecodingError {
+    #[error("Size too small, message size should be at least {MIN_MESSAGE_LENGTH}, actual size: {actual_size}")]
+    SizeTooSmall {
+        actual_size: usize,
+    },
+    #[error("Size too large, message size should be at most {MAX_MESSAGE_LENGTH}, actual size: {actual_size}")]
+    SizeTooLarge {
+        actual_size: usize,
+    },
+    #[error("CRC error")]
+    CrcError,
+    #[error("Unknown message type ({type_byte})")]
+    UnknownType {
+        type_byte: u8,
+    },
+    #[error("Error decoding event")]
+    EventDecodeError(#[from] EventDecodeError),
+    #[error("Error decoding command")]
+    CommandDecodeError(#[from] CommandDecodeError),
+    #[error("Error decoding program header")]
+    ProgramHeaderDecodeError(#[from] ProgramHeaderDecodeError),
+}
 
 // Message:
 // CRC: 2 bytes
@@ -21,10 +52,9 @@ pub(crate) struct Message {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MessageBody {
-    Unknown,
     Update {
         outputs: u32,
-        events: Vec<ButtonEvent>,
+        events: Vec<Event>,
     },
     Command {
         commands: Vec<Command>,
@@ -59,7 +89,6 @@ impl MessageBody {
     fn start_byte(&self) -> u8 {
         use MessageBody::*;
         match self {
-            Unknown => 0,
             Update { .. } => b'u',
             Command { .. } => b'c',
             ProgramStart { .. } => b's',
@@ -89,9 +118,7 @@ impl MessageBody {
                     digest.update(&[command_byte]);
                 }
             }
-            ProgramStart { header }
-            | ProgramStartAck { header }
-            | ProgramEndAck { header } => {
+            ProgramStart { header } | ProgramStartAck { header } | ProgramEndAck { header } => {
                 let header_bytes: [u8; ProgramHeader::header_length()] = header.into();
                 digest.update(&header_bytes);
             }
@@ -104,22 +131,21 @@ impl MessageBody {
     }
 }
 
-const MESSAGE_HEADER_LENGTH: usize = 3;
-const MIN_MESSAGE_LENGTH: usize = MESSAGE_HEADER_LENGTH;
-const MAX_MESSAGE_LENGTH: usize = 128;
-const MAX_MESSAGE_BODY_LENGTH: usize = MAX_MESSAGE_LENGTH - MESSAGE_HEADER_LENGTH;
-
-sa::const_assert_eq!(MIN_MESSAGE_LENGTH, 3);
-sa::const_assert_eq!(MAX_MESSAGE_BODY_LENGTH, 125);
-
 impl TryFrom<&[u8]> for Message {
     type Error = MessageDecodingError;
 
     fn try_from(message_bytes: &[u8]) -> Result<Self, Self::Error> {
         // Smallest possible message is 3 bytes (CRC + zero byte)
+        if message_bytes.len() < MIN_MESSAGE_LENGTH {
+            return Err(SizeTooSmall {
+                actual_size: message_bytes.len(),
+            });
+        }
         // Largest possible message is 128 bytes
-        if message_bytes.len() < MIN_MESSAGE_LENGTH || message_bytes.len() > MAX_MESSAGE_LENGTH {
-            return Err(MessageDecodingError {});
+        if message_bytes.len() > MAX_MESSAGE_LENGTH {
+            return Err(SizeTooLarge {
+                actual_size: message_bytes.len(),
+            });
         }
         let read_crc = u16::from_be_bytes([message_bytes[0], message_bytes[1]]);
         let crc = Crc::<u16>::new(&CRC_16_XMODEM);
@@ -129,22 +155,15 @@ impl TryFrom<&[u8]> for Message {
         digest.update(&[type_byte]);
         digest.update(body);
         if digest.finalize() != read_crc {
-            return Err(MessageDecodingError {});
+            return Err(CrcError);
         }
         match type_byte {
-            0x00 if body.len() == 0 => Ok(Message {
-                crc: read_crc,
-                body: MessageBody::Unknown,
-            }),
             b'u' if body.len() >= 4 => {
                 let outputs = u32::from_be_bytes([body[0], body[1], body[2], body[3]]);
-                let mut events: Vec<ButtonEvent> = vec![];
+                let mut events: Vec<Event> = vec![];
                 for b in &body[4..] {
-                    if let Ok(e) = (*b).try_into() {
-                        events.push(e);
-                    } else {
-                        return Err(MessageDecodingError {});
-                    }
+                    let e = (*b).try_into()?;
+                    events.push(e);
                 }
                 Ok(Message {
                     crc: read_crc,
@@ -154,11 +173,7 @@ impl TryFrom<&[u8]> for Message {
             b'c' => {
                 let mut commands: Vec<Command> = vec![];
                 for b in body {
-                    if let Ok(c) = (*b).try_into() {
-                        commands.push(c);
-                    } else {
-                        return Err(MessageDecodingError {});
-                    }
+                    commands.push((*b).try_into()?);
                 }
                 Ok(Message {
                     crc: read_crc,
@@ -166,24 +181,18 @@ impl TryFrom<&[u8]> for Message {
                 })
             }
             b's' if body.len() == ProgramHeader::header_length() => {
-                if let Ok(header) = body.try_into() {
-                    Ok(Message {
-                        crc: read_crc,
-                        body: MessageBody::ProgramStart { header },
-                    })
-                } else {
-                    Err(MessageDecodingError {})
-                }
+                let header = body.try_into()?;
+                Ok(Message {
+                    crc: read_crc,
+                    body: MessageBody::ProgramStart { header },
+                })
             }
             b'S' if body.len() == ProgramHeader::header_length() => {
-                if let Ok(header) = body.try_into() {
-                    Ok(Message {
-                        crc: read_crc,
-                        body: MessageBody::ProgramStartAck { header },
-                    })
-                } else {
-                    Err(MessageDecodingError {})
-                }
+                let header = body.try_into()?;
+                Ok(Message {
+                    crc: read_crc,
+                    body: MessageBody::ProgramStartAck { header },
+                })
             }
             b'd' => Ok(Message {
                 crc: read_crc,
@@ -194,16 +203,15 @@ impl TryFrom<&[u8]> for Message {
                 body: MessageBody::ProgramEnd { code: body.into() },
             }),
             b'E' if body.len() == ProgramHeader::header_length() => {
-                if let Ok(header) = body.try_into() {
-                    Ok(Message {
-                        crc: read_crc,
-                        body: MessageBody::ProgramEndAck { header },
-                    })
-                } else {
-                    Err(MessageDecodingError {})
-                }
+                let header = body.try_into()?;
+                Ok(Message {
+                    crc: read_crc,
+                    body: MessageBody::ProgramEndAck { header },
+                })
             }
-            _ => Err(MessageDecodingError {}),
+            _ => Err(UnknownType {
+                type_byte,
+            })
         }
     }
 }
@@ -222,7 +230,6 @@ impl From<&Message> for Vec<u8> {
 impl From<&MessageBody> for Vec<u8> {
     fn from(body: &MessageBody) -> Self {
         match body {
-            MessageBody::Unknown => vec![],
             MessageBody::Update { events, outputs } => {
                 let mut result = vec![];
                 result.extend_from_slice(&outputs.to_be_bytes());
@@ -265,32 +272,20 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::button_event::ButtonEvent;
-    use crate::controller::program_header::ProgramHeader;
+    use crate::controller::event::Event;
     use crate::controller::message::{Message, MessageBody};
-
-    #[test]
-    fn test_unknown() {
-        let message = Message::new(MessageBody::Unknown);
-        let bytes: Vec<u8> = (&message).into();
-        assert_eq!(&bytes, &[0x00, 0x00, 0x00]);
-        let message2 = (&bytes[..]).try_into();
-        assert_eq!(Ok(message), message2);
-    }
+    use crate::controller::program_header::ProgramHeader;
 
     #[test]
     fn test_update() {
         let message = Message::new(MessageBody::Update {
             outputs: 0xAABBCCDD,
-            events: vec![
-                ButtonEvent::PressStart(1),
-                ButtonEvent::PressEnd(2),
-            ],
+            events: vec![Event::RisingEdge(1), Event::FallingEdge(2)],
         });
         let bytes: Vec<u8> = (&message).into();
         assert_eq!(
             &bytes,
-            &[0x44, 0x8D, b'u', 0xAA, 0xBB, 0xCC, 0xDD, 0x41, 0xC2,]
+            &[0x8B, 0x95, b'u', 0xAA, 0xBB, 0xCC, 0xDD, 0x81, 0x02,]
         );
         let message2 = (&bytes[..]).try_into();
         assert_eq!(Ok(message), message2);

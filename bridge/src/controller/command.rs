@@ -1,30 +1,70 @@
-const TYPE_MASK: u8 = 0xE0;
-const OUTPUT_MASK: u8 = 0x1F;
-const TOGGLE: u8 = 0x40;
-const OFF: u8 = 0x80;
-const ON: u8 = 0xC0;
+use thiserror::Error;
+use crate::controller::command::Command::{Toggle, On, Off};
+
+const COMMAND_TYPE_MASK: u8 = 0b1110_0000;
+const OUTPUT_MASK: u8 = 0b0001_0000;
+const REFRESH_COMMAND: u8 = 0b0010_0000;
+const TOGGLE_COMMAND: u8 = 0b0100_0000;
+const OFF_COMMAND: u8 = 0b1000_0000;
+const ON_COMMAND: u8 = 0b1100_0000;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Command {
-    None,
     Refresh,
     Toggle(u8),
     Off(u8),
     On(u8),
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq)]
+#[error("Output out of range")]
+pub struct OutputOutOfRange;
+
+#[derive(Debug, Error, Eq, PartialEq)]
+#[error("Error decoding command")]
 pub(crate) struct CommandDecodeError;
+
+impl Command {
+    pub fn refresh() -> Self {
+        Command::Refresh
+    }
+
+    pub fn toggle(output: u8) -> Result<Self, OutputOutOfRange> {
+        let masked_output = output & OUTPUT_MASK;
+        if masked_output == output {
+            Ok(Toggle(output))
+        } else {
+            Err(OutputOutOfRange)
+        }
+    }
+
+    pub fn on(output: u8) -> Result<Self, OutputOutOfRange> {
+        let masked_output = output & OUTPUT_MASK;
+        if masked_output == output {
+            Ok(On(output))
+        } else {
+            Err(OutputOutOfRange)
+        }
+    }
+
+    pub fn off(output: u8) -> Result<Self, OutputOutOfRange> {
+        let masked_output = output & OUTPUT_MASK;
+        if masked_output == output {
+            Ok(Off(output))
+        } else {
+            Err(OutputOutOfRange)
+        }
+    }
+}
 
 impl TryFrom<u8> for Command {
     type Error = CommandDecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let command_type = value & TYPE_MASK;
+        let command_type = value & COMMAND_TYPE_MASK;
         let output = value & OUTPUT_MASK;
         use Command::*;
         match command_type {
-            0x00 => Ok(None),
             0x20 => Ok(Refresh),
             0x40 => Ok(Toggle(output)),
             0x80 => Ok(Off(output)),
@@ -38,11 +78,10 @@ impl From<&Command> for u8 {
     fn from(command: &Command) -> Self {
         use Command::*;
         match command {
-            None => 0x00,
-            Refresh => 0x20,
-            Toggle(output) => TOGGLE | (output & OUTPUT_MASK),
-            Off(output) => OFF | (output & OUTPUT_MASK),
-            On(output) => ON | (output & OUTPUT_MASK),
+            Refresh => REFRESH_COMMAND,
+            Toggle(output) => TOGGLE_COMMAND | output,
+            Off(output) => OFF_COMMAND | output,
+            On(output) => ON_COMMAND | output,
         }
     }
 }

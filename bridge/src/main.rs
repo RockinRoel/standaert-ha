@@ -12,11 +12,11 @@ use rumqttc::{AsyncClient, MqttOptions, QoS};
 use slip_codec::tokio::SlipCodec;
 use std::time::Duration;
 use tokio::signal;
-use tokio::time::sleep;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::time::sleep;
 use tokio_serial::SerialPortBuilderExt;
 use tokio_util::codec::Decoder;
 use tokio_util::sync::CancellationToken;
@@ -169,8 +169,8 @@ async fn main() -> Result<()> {
         if !program_file.is_empty() {
             program_str = std::fs::read_to_string(&program_file)?;
         }
-        let ast_program = shal::parser::parse(&program_str);
-        let bytecode_program = shal::compiler::compile(&ast_program);
+        let ast_program = shal::parser::parse(&program_str)?;
+        let bytecode_program = shal::compiler::compile(&ast_program)?;
 
         let stack_depth = bytecode_program.check_stack_depth(Some(32))?;
         println!("Stack depth: {}", stack_depth);
@@ -246,9 +246,7 @@ async fn main() -> Result<()> {
     if let Some(program) = program {
         let header = program[0..8].try_into()?;
         let code = &program[8..];
-        sender_to_controller.send(Message::new(MessageBody::ProgramStart {
-            header,
-        }))?;
+        sender_to_controller.send(Message::new(MessageBody::ProgramStart { header }))?;
         let mut pos = 0;
         while pos < code.len() {
             if code.len() - pos > Message::max_message_body_length() {
