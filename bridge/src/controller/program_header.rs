@@ -1,6 +1,7 @@
-use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
+use crate::controller::program_header::ProgramHeaderDecodeError::{
+    IncorrectHeaderSize, IncorrectPrefix,
+};
+use thiserror::Error;
 
 const PROGRAM_HEADER_LENGTH: usize = 8;
 
@@ -10,19 +11,14 @@ pub(crate) struct ProgramHeader {
     crc: u16,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ProgramHeaderDecodeError;
-
-impl fmt::Display for ProgramHeaderDecodeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("Program header decode error") // TODO(Roel)
-    }
-}
-
-impl Error for ProgramHeaderDecodeError {
-    fn description(&self) -> &str {
-        "Program header decode error" // TODO(Roel)
-    }
+#[derive(Error, Debug, Eq, PartialEq)]
+pub(crate) enum ProgramHeaderDecodeError {
+    #[error("Incorrect header size: should be 8, was {actual_size}")]
+    IncorrectHeaderSize { actual_size: usize },
+    #[error(
+        "Header does not start with \"SHAL\" ([83, 72, 65, 76]), but starts with {actual_prefix:?}"
+    )]
+    IncorrectPrefix { actual_prefix: Vec<u8> },
 }
 
 impl TryFrom<&[u8]> for ProgramHeader {
@@ -30,10 +26,15 @@ impl TryFrom<&[u8]> for ProgramHeader {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != 8 {
-            return Err(ProgramHeaderDecodeError {});
+            return Err(IncorrectHeaderSize {
+                actual_size: value.len(),
+            });
         }
-        if &value[0..4] != b"SHAL" {
-            return Err(ProgramHeaderDecodeError {});
+        let prefix = &value[0..4];
+        if &prefix != b"SHAL" {
+            return Err(IncorrectPrefix {
+                actual_prefix: prefix.into(),
+            });
         }
         let len_bytes = &value[4..6];
         let crc_bytes = &value[6..8];
@@ -68,5 +69,68 @@ impl ProgramHeader {
 
     pub fn new(length: u16, crc: u16) -> Self {
         ProgramHeader { length, crc }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::controller::program_header::ProgramHeaderDecodeError::{
+        IncorrectHeaderSize, IncorrectPrefix,
+    };
+    use crate::controller::program_header::{
+        ProgramHeader, ProgramHeaderDecodeError, PROGRAM_HEADER_LENGTH,
+    };
+
+    #[test]
+    fn test_serialize() {
+        let header = ProgramHeader {
+            length: 1000,
+            crc: 2000,
+        };
+        let serialized: [u8; PROGRAM_HEADER_LENGTH] = (&header).into();
+        assert_eq!(
+            &[b'S', b'H', b'A', b'L', 0x03, 0xE8, 0x07, 0xD0],
+            &serialized,
+        )
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let serialized = [b'S', b'H', b'A', b'L', 0x03, 0xE8, 0x07, 0xD0];
+        let header: Result<ProgramHeader, ProgramHeaderDecodeError> = (&serialized[..]).try_into();
+        assert_eq!(
+            &Ok(ProgramHeader {
+                length: 1000,
+                crc: 2000,
+            }),
+            &header
+        )
+    }
+
+    #[test]
+    fn test_deserialize_incorrect_length() {
+        let serialized = [b'S', b'H', b'A', b'L', 1, 2, 3];
+        let result: Result<ProgramHeader, ProgramHeaderDecodeError> = (&serialized[..]).try_into();
+        assert_eq!(&Err(IncorrectHeaderSize { actual_size: 7 }), &result);
+        assert_eq!(
+            "Incorrect header size: should be 8, was 7",
+            result.unwrap_err().to_string()
+        )
+    }
+
+    #[test]
+    fn test_deserialize_wrong_prefix() {
+        let serialized = [1, 2, 3, 4, 5, 6, 7, 8];
+        let result: Result<ProgramHeader, ProgramHeaderDecodeError> = (&serialized[..]).try_into();
+        assert_eq!(
+            &Err(IncorrectPrefix {
+                actual_prefix: vec![1, 2, 3, 4],
+            }),
+            &result
+        );
+        assert_eq!(
+            "Header does not start with \"SHAL\" ([83, 72, 65, 76]), but starts with [1, 2, 3, 4]",
+            result.unwrap_err().to_string()
+        )
     }
 }
