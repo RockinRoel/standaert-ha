@@ -19,6 +19,8 @@
 
 namespace StandaertHA::Errors {
   const char MAXIMUM_CODE_SIZE_ERROR[] PROGMEM = {"Maximum code size exceeded!"};
+  const char UNEXPECTED_PROGRAM_END_ERROR[] PROGMEM = {"Unexpected program end message"};
+  const char UNEXPECTED_PROGRAM_DATA_ERROR[] PROGMEM = {"Unexpected program data message"};
   const char CODE_SIZE_MISMATCH_ERROR[] PROGMEM = {"Code size does not match size declared in program header!"};
   const char PROGRAM_VERIFICATION_ERROR[] PROGMEM = {"Program CRC check failed!"};
 }
