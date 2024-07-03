@@ -18,74 +18,70 @@
 #include <Arduino.h>
 
 namespace StandaertHA::Comm {
+  constexpr uint8_t EVENT_TYPE_MASK = 0xE0;
+  constexpr uint8_t INPUT_MASK = 0x1F;
 
   /**
-   * ButtonEvent, encoded as:
+   * Event, encoded as:
    *
-   * TV0IIIII
-   * ^^     ^
-   * ||     \- Button id
-   * |\------- Valid
-   * \-------- Type
+   * TTTIIIII
+   * 
+   * TTT: event type
+   * IIIII: input id
    *
    * e.g.
-   * 01000010 : second button press start
-   * 11000010 : second button press end
-   * 00000000 : not valid
+   * 00100010 : third input (input id 2, counting from 0) falling edge
+   * 01100010 : third input (input id 2, counting from 0) rising edge
    */
-  class ButtonEvent {
+  class Event {
   public:
     enum class Type : uint8_t {
-      PressStart = 0x00,
-      PressEnd   = 0x80
+      Uninit      = 0x00,
+      FallingEdge = 0x20,
+      RisingEdge  = 0x60,
     };
 
-    constexpr ButtonEvent() noexcept
+    constexpr Event() noexcept
       : data_(0)
     { }
 
-    constexpr explicit ButtonEvent(uint8_t button, Type type) noexcept
+    constexpr explicit Event(Type type, uint8_t input) noexcept
       : data_(static_cast<uint8_t>(type) | // type
-              (button & 0x1F) | // button id
-              0x40) // valid
+              (input & 0x1F)) // input id
     { }
 
-    constexpr bool valid() const noexcept {
-      return data_ & 0x40;
-    }
-
     [[nodiscard]] constexpr Type type() const noexcept {
-      return static_cast<Type>(data_ & 0x80);
+      return static_cast<Type>(data_ & EVENT_TYPE_MASK);
     }
 
-    [[nodiscard]] constexpr uint8_t button() const noexcept {
-      return data_ & 0x1F;
+    [[nodiscard]] constexpr uint8_t input() const noexcept {
+      return data_ & INPUT_MASK;
     }
 
     [[nodiscard]] constexpr uint8_t raw() const noexcept {
       return data_;
     }
 
-    [[nodiscard]] static constexpr ButtonEvent from_raw(uint8_t data) noexcept {
-      return ButtonEvent(data);
+    [[nodiscard]] static constexpr Event from_raw(uint8_t data) noexcept {
+      return Event(data);
     }
 
-    [[nodiscard]] constexpr bool operator==(const ButtonEvent& other) const noexcept {
+    [[nodiscard]] constexpr bool operator==(const Event& other) const noexcept {
       return data_ == other.data_;
     }
 
-    [[nodiscard]] constexpr bool operator!=(const ButtonEvent& other) const noexcept {
+    [[nodiscard]] constexpr bool operator!=(const Event& other) const noexcept {
       return !operator==(other);
     }
 
   private:
-    constexpr explicit ButtonEvent(uint8_t data) noexcept
+    constexpr explicit Event(uint8_t data) noexcept
       : data_(data)
     { }
 
     uint8_t data_;
   } __attribute__((packed));
 
-  static_assert(sizeof(ButtonEvent) == 1);
+  static_assert(sizeof(Event) == 1);
 
 } // StandaertHA::Comm

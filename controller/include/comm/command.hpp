@@ -20,6 +20,8 @@
 #include "collections/bitset32.hpp"
 
 namespace StandaertHA::Comm {
+  constexpr uint8_t COMMAND_TYPE_MASK = 0xE0;
+  constexpr uint8_t OUTPUT_MASK = 0x1F;
 
   /**
    * Command, encoded as:
@@ -32,7 +34,7 @@ namespace StandaertHA::Comm {
   class Command {
   public:
     enum class Type : uint8_t {
-      None   = 0x00,
+      Uninit   = 0x00,
       Refresh = 0x20,
       Toggle = 0x40,
       Off    = 0x80,
@@ -45,23 +47,31 @@ namespace StandaertHA::Comm {
 
     constexpr explicit Command(Type type, uint8_t output) noexcept
       : data_(static_cast<uint8_t>(type) | // type
-              (output & 0x1F)) // output
+              (output & OUTPUT_MASK)) // output
     { }
 
     [[nodiscard]] constexpr Type type() const noexcept {
-      return static_cast<Type>(data_ & 0xE0);
+      return static_cast<Type>(data_ & COMMAND_TYPE_MASK);
     }
 
     [[nodiscard]] constexpr uint8_t output() const noexcept {
-      return data_ & 0x1F;
+      return data_ & OUTPUT_MASK;
     }
 
     [[nodiscard]] constexpr uint8_t raw() const noexcept {
       return data_;
     }
 
-    constexpr static Command from_raw(uint8_t data) noexcept {
+    [[nodiscard]] constexpr static Command from_raw(uint8_t data) noexcept {
       return Command(data);
+    }
+
+    [[nodiscard]] constexpr bool operator==(const Command& other) const noexcept {
+      return data_ == other.data_;
+    }
+
+    [[nodiscard]] constexpr bool operator!=(const Command& other) const noexcept {
+      return !operator==(other);
     }
 
     [[nodiscard]] constexpr Collections::BitSet32 apply(const Collections::BitSet32 before) const noexcept {

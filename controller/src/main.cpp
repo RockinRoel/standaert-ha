@@ -33,6 +33,21 @@
 namespace StandaertHA {
   State state;
 
+  void debounce(State& state) noexcept;
+  bool receive(State& state) noexcept;
+  void handle_command_message(State& state) noexcept;
+  void handle_program_message(State& state) noexcept;
+  void receive_program_data(State& state) noexcept;
+  void abort_upload(State& state) noexcept;
+  void finalize_program_upload(State& state) noexcept;
+  void handle(State& state) noexcept;
+  void recv_message(State& state) noexcept;
+  void handle_message(State& state) noexcept;
+  void update_inputs(State& state) noexcept;
+  bool run_program(State& state) noexcept;
+  void update_outputs(const State& state, const Collections::BitSet32& output_before) noexcept;
+  void send_update(State& state, const Collections::BitSet32& output_before) noexcept;
+
   void debounce(State& state) noexcept
   {
     state.input.previous = state.input.current;
@@ -60,7 +75,7 @@ namespace StandaertHA {
     state.input.last_read = inputs;
   }
 
-  bool receive(State& state)
+  bool receive(State& state) noexcept
   {
     // Reset message
     state.message = Comm::Message();
@@ -110,20 +125,20 @@ namespace StandaertHA {
     return false;
   }
 
-  void handle(State& state) {
-    switch (state.message.type()) {
-      case Comm::MessageType::Command: {
-        const auto& commandMsg = state.message.body_as_command_msg();
-        for (uint8_t i = 0; i < state.message.body_length(); ++i) {
-          const Comm::Command& command = commandMsg.command[i];
-          if (command.type() == Comm::Command::Type::Refresh) {
-            state.refresh = true;
-          } else {
-            state.output = command.apply(state.output);
-          }
-        }
-        break;
+  void handle_command_message(State& state) noexcept {
+    const auto& commandMsg = state.message.body_as_command_msg();
+    for (uint8_t i = 0; i < state.message.body_length(); ++i) {
+      const Comm::Command& command = commandMsg.command[i];
+      if (command.type() == Comm::Command::Type::Refresh) {
+        state.refresh = true;
+      } else {
+        state.output = command.apply(state.output);
       }
+    }
+  }
+
+  void handle_program_message(State& state) noexcept {
+    switch (state.message.type()) {
       case Comm::MessageType::ProgramStart: {
         state.upload_state.uploading = true;
         state.upload_state.position = 0;
@@ -131,55 +146,84 @@ namespace StandaertHA {
         Comm::Serial::send_program_start_ack(state.program.header());
         break;
       }
-      case Comm::MessageType::ProgramData:
       case Comm::MessageType::ProgramEnd: {
-        if (!state.upload_state.uploading) {
-          // Wrong state
-          return;
-        }
-        uint32_t new_size = static_cast<uint32_t>(state.upload_state.position) + static_cast<uint32_t>(state.message.body_length());
-        bool size_error = false;
-        if (new_size > static_cast<uint32_t>(Shal::Interpreter::MAX_CODE_SIZE)) {
-          Comm::Serial::send_error(Errors::MAXIMUM_CODE_SIZE_ERROR);
-          size_error = true;
-        }
-        if (!size_error && new_size > static_cast<uint32_t>(state.program.header().length())) {
-          Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
-          size_error = true;
-        }
-        if (size_error) {
-          // Error: abort upload
-          state.upload_state.uploading = false;
-          state.upload_state.position = 0;
-          // reload program from EEPROM
-          state.program.load();
-          return;
-        }
-        memcpy(state.program.code() + state.upload_state.position,
-               state.message.body_as_program_data().code,
-               state.message.body_length());
-        state.upload_state.position += state.message.body_length();
-        if (state.message.type() == Comm::MessageType::ProgramEnd) {
-          // Upload done
-          state.upload_state.uploading = false;
-          state.upload_state.position = 0;
-          if (new_size != static_cast<uint32_t>(state.program.header().length())) {
-            Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
-            state.program.load();
-            return;
-          }
-          if (!state.program.verify()) {
-            // Error: reload from EEPROM
-            Comm::Serial::send_error(Errors::PROGRAM_VERIFICATION_ERROR);
-            state.program.load();
-            return;
-          }
-          // Upload done, save to EEPROM
-          state.program.save();
+        if (state.upload_state.uploading) {
+          receive_program_data(state);
+          finalize_program_upload(state);
+        } else {
+          Comm::Serial::send_error(Errors::UNEXPECTED_PROGRAM_END_ERROR);
           Comm::Serial::send_program_end_ack(state.program.header());
         }
-        break;
       }
+      case Comm::MessageType::ProgramData: {
+        if (state.upload_state.uploading) {
+          receive_program_data(state);
+        } else {
+          Comm::Serial::send_error(Errors::UNEXPECTED_PROGRAM_DATA_ERROR);
+        }
+      }
+    }
+  }
+
+  void receive_program_data(State& state) noexcept {
+    uint32_t new_size = static_cast<uint32_t>(state.upload_state.position) + static_cast<uint32_t>(state.message.body_length());
+    bool size_error = false;
+    if (new_size > static_cast<uint32_t>(Shal::Interpreter::MAX_CODE_SIZE)) {
+      Comm::Serial::send_error(Errors::MAXIMUM_CODE_SIZE_ERROR);
+      size_error = true;
+    }
+    if (!size_error && new_size > static_cast<uint32_t>(state.program.header().length())) {
+      Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
+      size_error = true;
+    }
+    if (size_error) {
+      abort_upload(state);
+    }
+    memcpy(state.program.code() + state.upload_state.position,
+           state.message.body_as_program_data().code,
+           state.message.body_length());
+    state.upload_state.position += state.message.body_length();
+  }
+
+  void abort_upload(State& state) noexcept {
+    state.upload_state.uploading = false;
+    state.upload_state.position = 0;
+    // reload program from EEPROM
+    state.program.load();
+  }
+
+  void finalize_program_upload(State& state) noexcept {
+    uint16_t program_size = state.upload_state.position;
+    state.upload_state.uploading = false;
+    state.upload_state.position = 0;
+    if (program_size != static_cast<uint32_t>(state.program.header().length())) {
+      Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
+      state.program.load();
+      Comm::Serial::send_program_end_ack(state.program.header());
+      return;
+    }
+    if (!state.program.verify()) {
+      // Error: reload from EEPROM
+      Comm::Serial::send_error(Errors::PROGRAM_VERIFICATION_ERROR);
+      state.program.load();
+      Comm::Serial::send_program_end_ack(state.program.header());
+      return;
+    }
+    // Upload done, save to EEPROM
+    state.program.save();
+    Comm::Serial::send_program_end_ack(state.program.header());
+  }
+
+  void handle(State& state) noexcept {
+    switch (state.message.type()) {
+      case Comm::MessageType::Command:
+        handle_command_message(state);
+        break;
+      case Comm::MessageType::ProgramStart:
+      case Comm::MessageType::ProgramData:
+      case Comm::MessageType::ProgramEnd:
+        handle_program_message(state);
+        break;
       default: {
         // Do nothing
       }
@@ -187,22 +231,22 @@ namespace StandaertHA {
   }
 
   // Receive messages
-  void recv_message(State& state) {
+  void recv_message(State& state) noexcept {
     receive(state);
   }
 
   // Handle messages
-  void handle_message(State& state) {
+  void handle_message(State& state) noexcept {
     handle(state);
   }
 
   // Update inputs
-  void update_inputs(State& state) {
+  void update_inputs(State& state) noexcept {
     debounce(state);
   }
 
   // Run program
-  bool run_program(State& state) {
+  bool run_program(State& state) noexcept {
     if (HAL::read_mode() == Mode::PROGRAM_DISABLED) {
       // Program is disabled
       return true;
@@ -220,14 +264,14 @@ namespace StandaertHA {
     return success;
   }
 
-  void update_outputs(const State& state, const Collections::BitSet32& output_before) {
+  void update_outputs(const State& state, const Collections::BitSet32& output_before) noexcept {
     if (state.output != output_before) {
       HAL::IO::write_outputs(state.output);
     }
   }
 
   // Send messages
-  void send_update(State& state, const Collections::BitSet32& output_before) {
+  void send_update(State& state, const Collections::BitSet32& output_before) noexcept {
     const bool refresh_requested = state.refresh;
     const bool input_changed = state.input.current != state.input.previous;
     const bool output_changed = state.output != output_before;

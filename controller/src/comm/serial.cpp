@@ -40,15 +40,14 @@ namespace StandaertHA::Comm::Serial {
     update_msg.outputs = Util::Inet::htonl(state.output.value());
     uint8_t event_count = 0;
     for (uint8_t i = 0; i < 32; ++i) {
-      // TODO(Roel): bounds check? Should be safe...
-      ButtonEvent& next_event = update_msg.events[event_count];
-      const bool press_start = !state.input.current.get(i) && state.input.previous.get(i);
-      const bool press_end = state.input.current.get(i) && !state.input.previous.get(i);
-      if (press_start || press_end) {
-        if (press_start) {
-          next_event = ButtonEvent(i, ButtonEvent::Type::PressStart);
+      Event& next_event = update_msg.events[event_count];
+      const bool fedge = !state.input.current.get(i) && state.input.previous.get(i);
+      const bool redge = state.input.current.get(i) && !state.input.previous.get(i);
+      if (redge || fedge) {
+        if (redge) {
+          next_event = Event(Event::Type::RisingEdge, i);
         } else {
-          next_event = ButtonEvent(i, ButtonEvent::Type::PressEnd);
+          next_event = Event(Event::Type::FallingEdge, i);
         }
         ++event_count;
       }
@@ -85,6 +84,18 @@ namespace StandaertHA::Comm::Serial {
     }
 
     Comm::Message message(fail_msg, i);
+    send(message);
+  }
+
+  void send_info(const char * const info_message, const size_t size) noexcept
+  {
+    Comm::InfoMsg info_msg;
+    size_t i = 0;
+    for (; i < size && i < sizeof(info_msg.message); ++i) {
+      info_msg.message[i] = pgm_read_byte_near(info_message + i);
+    }
+
+    Comm::Message message(info_msg, i);
     send(message);
   }
 

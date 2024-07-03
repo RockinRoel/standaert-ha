@@ -31,6 +31,7 @@ namespace StandaertHA::Comm::Serial {
   extern void send_program_end_ack(const Shal::Interpreter::ProgramHeader& header) noexcept;
 
   extern void send_error(const char* message, size_t size) noexcept;
+  extern void send_info(const char* message, size_t size) noexcept;
 
   template<size_t size>
   inline void send_error(const char (&message)[size]) noexcept
@@ -38,4 +39,9 @@ namespace StandaertHA::Comm::Serial {
     send_error(message, size - 1);
   }
 
+  template<size_t size>
+  inline void send_info(const char (&message)[size]) noexcept
+  {
+    send_info(message, size - 1);
+  }
 }

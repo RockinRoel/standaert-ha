@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "button_event.hpp"
+#include "event.hpp"
 #include "command.hpp"
 #include "util/pred.hpp"
 
@@ -31,11 +31,12 @@ namespace StandaertHA::Comm {
   constexpr size_t MAX_MESSAGE_BODY_LENGTH = MAX_MESSAGE_LENGTH - MESSAGE_HEADER_LENGTH;
 
   enum class MessageType : uint8_t {
-    Unknown = 0x00,
+    Uninit = 0,
 
     Update = 'u', // Update from controller (output state + button events)
     Command = 'c', // Commands from host
     Fail = 'F', // Error message
+    Info = 'I', // Info message
 
     ProgramStart = 's', // Start transmit program (program header (8 bytes))
     ProgramStartAck = 'S', // Acknowledge transmit program (program header (8 bytes))
@@ -46,7 +47,6 @@ namespace StandaertHA::Comm {
 
   static_assert(
     Util::Pred::all_different(
-      MessageType::Unknown,
       MessageType::Update,
       MessageType::Command,
       MessageType::Fail,
@@ -61,7 +61,7 @@ namespace StandaertHA::Comm {
 
   struct UpdateMsg {
     uint32_t outputs;
-    ButtonEvent events[MAX_MESSAGE_BODY_LENGTH - sizeof(outputs)];
+    Event events[MAX_MESSAGE_BODY_LENGTH - sizeof(outputs)];
   } __attribute__((packed));
 
   static_assert(sizeof(UpdateMsg) <= MAX_MESSAGE_BODY_LENGTH);
@@ -77,6 +77,12 @@ namespace StandaertHA::Comm {
   } __attribute__((packed));
 
   static_assert(sizeof(FailMsg) <= MAX_MESSAGE_BODY_LENGTH);
+
+  struct InfoMsg {
+    unsigned char message[MAX_MESSAGE_BODY_LENGTH];
+  } __attribute__((packed));
+
+  static_assert(sizeof(InfoMsg) <= MAX_MESSAGE_BODY_LENGTH);
 
   struct ProgramStart {
     Shal::Interpreter::ProgramHeader header;
@@ -112,6 +118,7 @@ namespace StandaertHA::Comm {
     UpdateMsg update;
     CommandMsg command;
     FailMsg fail_msg;
+    InfoMsg info_msg;
     ProgramStart program_start;
     ProgramStartAck program_start_ack;
     ProgramData program_data;
@@ -131,6 +138,7 @@ namespace StandaertHA::Comm {
     explicit Message(const UpdateMsg& update, uint8_t event_count) noexcept;
     explicit Message(const CommandMsg& command, uint8_t command_count) noexcept;
     explicit Message(const FailMsg& fail_msg, uint8_t size) noexcept;
+    explicit Message(const InfoMsg& info_msg, uint8_t size) noexcept;
     explicit Message(const ProgramStart& program_start) noexcept;
     explicit Message(const ProgramStartAck& program_start_ack) noexcept;
     explicit Message(const ProgramData& program_data, uint8_t byte_count) noexcept;
@@ -143,6 +151,8 @@ namespace StandaertHA::Comm {
 
     [[nodiscard]] constexpr const UpdateMsg& body_as_update() const noexcept { return body_.update; }
     [[nodiscard]] constexpr const CommandMsg& body_as_command_msg() const noexcept { return body_.command; }
+    [[nodiscard]] constexpr const FailMsg& body_as_fail_msg() const noexcept { return body_.fail_msg; }
+    [[nodiscard]] constexpr const InfoMsg& body_as_info_msg() const noexcept { return body_.info_msg; }
     [[nodiscard]] constexpr const ProgramStart& body_as_program_start() const noexcept { return body_.program_start; }
     [[nodiscard]] constexpr const ProgramStartAck& body_as_program_start_ack() const noexcept { return body_.program_start_ack; }
     [[nodiscard]] constexpr const ProgramData& body_as_program_data() const noexcept { return body_.program_data; }

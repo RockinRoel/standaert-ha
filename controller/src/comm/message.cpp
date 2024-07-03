@@ -25,7 +25,7 @@ Message::Message() noexcept
   : body_{
       .raw = {0},
     },
-    type_(MessageType::Unknown),
+    type_(MessageType::Uninit),
     crc_(0),
     body_length_(0)
 {}
