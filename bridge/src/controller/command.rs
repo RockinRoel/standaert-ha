@@ -2,7 +2,7 @@ use thiserror::Error;
 use crate::controller::command::Command::{Toggle, On, Off};
 
 const COMMAND_TYPE_MASK: u8 = 0b1110_0000;
-const OUTPUT_MASK: u8 = 0b0001_0000;
+const OUTPUT_MASK: u8 = 0b0001_1111;
 const REFRESH_COMMAND: u8 = 0b0010_0000;
 const TOGGLE_COMMAND: u8 = 0b0100_0000;
 const OFF_COMMAND: u8 = 0b1000_0000;
