@@ -1,3 +1,4 @@
+use std::string::FromUtf8Error;
 use static_assertions as sa;
 
 use crate::controller::event::{Event, EventDecodeError};
@@ -35,6 +36,8 @@ pub(crate) enum MessageDecodingError {
     EventDecodeError(#[from] EventDecodeError),
     #[error("Error decoding command")]
     CommandDecodeError(#[from] CommandDecodeError),
+    #[error("Error UTF-8 decoding message")]
+    FromUtf8Error(#[from] FromUtf8Error),
     #[error("Error decoding program header")]
     ProgramHeaderDecodeError(#[from] ProgramHeaderDecodeError),
 }
@@ -58,6 +61,12 @@ pub(crate) enum MessageBody {
     },
     Command {
         commands: Vec<Command>,
+    },
+    Fail {
+        message: String,
+    },
+    Info {
+        message: String,
     },
     ProgramStart {
         header: ProgramHeader,
@@ -91,6 +100,8 @@ impl MessageBody {
         match self {
             Update { .. } => b'u',
             Command { .. } => b'c',
+            Fail { .. } => b'F',
+            Info { .. } => b'I',
             ProgramStart { .. } => b's',
             ProgramStartAck { .. } => b'S',
             ProgramData { .. } => b'd',
@@ -117,6 +128,9 @@ impl MessageBody {
                     let command_byte: u8 = command.into();
                     digest.update(&[command_byte]);
                 }
+            }
+            Fail { message } | Info { message } => {
+                digest.update(message.as_bytes())
             }
             ProgramStart { header } | ProgramStartAck { header } | ProgramEndAck { header } => {
                 let header_bytes: [u8; ProgramHeader::header_length()] = header.into();
@@ -178,6 +192,18 @@ impl TryFrom<&[u8]> for Message {
                 Ok(Message {
                     crc: read_crc,
                     body: MessageBody::Command { commands },
+                })
+            }
+            b'F' => {
+                Ok(Message {
+                    crc: read_crc,
+                    body: MessageBody::Fail { message: String::from_utf8(body.to_vec())? },
+                })
+            }
+            b'I' => {
+                Ok(Message {
+                    crc: read_crc,
+                    body: MessageBody::Info { message: String::from_utf8(body.to_vec())? },
                 })
             }
             b's' if body.len() == ProgramHeader::header_length() => {
@@ -245,6 +271,10 @@ impl From<&MessageBody> for Vec<u8> {
                 }
                 result
             }
+            MessageBody::Fail { message }
+            | MessageBody::Info { message } => {
+                message.as_bytes().into()
+            }
             MessageBody::ProgramStart { header }
             | MessageBody::ProgramStartAck { header }
             | MessageBody::ProgramEndAck { header } => {
@@ -285,7 +315,7 @@ mod tests {
         let bytes: Vec<u8> = (&message).into();
         assert_eq!(
             &bytes,
-            &[0x8B, 0x95, b'u', 0xAA, 0xBB, 0xCC, 0xDD, 0x81, 0x02,]
+            &[0xBF, 0x45, b'u', 0xAA, 0xBB, 0xCC, 0xDD, 0x61, 0x22,]
         );
         let message2 = (&bytes[..]).try_into();
         assert_eq!(Ok(message), message2);
