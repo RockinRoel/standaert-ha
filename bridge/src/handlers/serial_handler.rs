@@ -1,5 +1,4 @@
-use std::sync::mpsc::Sender;
-use tokio::sync::mpsc::{UnboundedSender, UnboundedReceiver};
+use tokio::sync::mpsc::UnboundedSender;
 use slip_codec::tokio::SlipCodec;
 use futures::SinkExt;
 use futures::stream::StreamExt;
@@ -22,7 +21,7 @@ pub struct SerialHandler {
 }
 
 impl SerialHandler {
-    pub fn new(serial_port: String, sender: Sender<Message>) -> Self {
+    pub fn new(serial_port: String, sender: UnboundedSender<Message>) -> Self {
         let (serial_sender, mut serial_receiver) = tokio::sync::mpsc::unbounded_channel::<MessageBody>();
         let cancellation_token = CancellationToken::new();
         let cancellation_token_clone = cancellation_token.clone();
@@ -51,7 +50,6 @@ impl SerialHandler {
                     _ = cancellation_token_clone.cancelled() => break,
                 }
             }
-            println!("After loop");
         });
         Self {
             task,
@@ -69,7 +67,9 @@ impl Handler for SerialHandler {
             }
             Message::Stop => {
                 self.cancellation_token.cancel();
-                // TODO(Roel): await task???
+                while !self.task.is_finished() {
+                    // Busy wait??
+                }
             }
             _ => {}
         }

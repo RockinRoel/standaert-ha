@@ -15,6 +15,7 @@ use futures::SinkExt;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use slip_codec::tokio::SlipCodec;
 use std::time::Duration;
+use tokio::signal;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
@@ -170,7 +171,7 @@ async fn main() -> Result<()> {
 
     println!("Args: {:?}", args);
 
-    let (sender, receiver) = mpsc::channel();
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
 
     let mut chain = HandlerChain::new();
 
@@ -190,41 +191,29 @@ async fn main() -> Result<()> {
         // TODO(Roel): add MQTT
     }
 
-    chain.handle(&handlers::message::Message::ReloadProgram);
-    chain.handle(&handlers::message::Message::SendToController(MessageBody::Command {
+    sender.send(handlers::message::Message::ReloadProgram).expect("Could not send reload?"); // TODO(Roel): ???
+
+    sender.send(handlers::message::Message::SendToController(MessageBody::Command {
         commands: vec![Command::Refresh],
-    }));
+    })).expect("Could not send refresh?"); // TODO(Roel): ???
 
     loop {
-        let message = receiver.recv().expect("Receive error?");
-        chain.handle(&message);
-        if message == handlers::message::Message::Stop {
-            return Ok(())
+        tokio::select! {
+            message = receiver.recv() => {
+                if let Some(message) = message {
+                    chain.handle(&message);
+                    if message == handlers::message::Message::Stop {
+                            return Ok(())
+                        }
+                } else {
+                    // TODO(Roel): ???
+                }
+            },
+            _ = signal::ctrl_c() => {
+                sender.send(handlers::message::Message::Stop).expect("Could not send stop?"); // TODO(Roel): ???
+            }
         }
     }
-
-    // let mut program = None;
-
-    // if let Some(program_file) = args.program {
-    //     let mut program_str = "".to_string();
-    //     if !program_file.is_empty() {
-    //         program_str = std::fs::read_to_string(&program_file)?;
-    //     }
-    //     let ast_program = shal::parser::parse(&program_str)?;
-    //     let bytecode_program = shal::compiler::compile(&ast_program)?;
-    //
-    //     let stack_depth = bytecode_program.check_stack_depth(Some(32))?;
-    //     println!("Stack depth: {}", stack_depth);
-    //
-    //     let program_length = bytecode_program.check_program_length(Some(248))?;
-    //     println!("Program length: {}", program_length);
-    //
-    //     let bytes: Vec<u8> = (&bytecode_program).into();
-    //
-    //     println!("Bytes: {}", bytes.len());
-    //
-    //     program = Some(bytes);
-    // }
 
     // let mqtt_port = if args.mqtt_use_tls { 8883 } else { 1883 };
     // let mut mqtt_options = MqttOptions::new(args.id, args.mqtt_host, mqtt_port);

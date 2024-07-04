@@ -8,6 +8,7 @@ use crate::handlers::programmer::State::Neutral;
 use crate::shal::bytecode::Program;
 use crate::shal::{compiler, parser};
 use std::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
 
 enum State {
     Neutral,
@@ -19,11 +20,11 @@ pub struct Programmer {
     program_path: String,
     state: State,
     program: Option<Program>,
-    sender: mpsc::Sender<Message>,
+    sender: UnboundedSender<Message>,
 }
 
 impl Programmer {
-    pub fn new(program_path: String, sender: mpsc::Sender<Message>) -> Self {
+    pub fn new(program_path: String, sender: UnboundedSender<Message>) -> Self {
         Programmer {
             program_path,
             state: Neutral,
@@ -40,7 +41,9 @@ impl Programmer {
             std::fs::read_to_string(&self.program_path).expect("Failed to read program!");
         let program_ast = parser::parse(&program_str).expect("Failed to parse program!");
         let program_bytecode = compiler::compile(&program_ast).expect("Failed to compile program!");
-        // TODO(Roel): check constraints!
+        let _stack_depth = program_bytecode.check_stack_depth(Some(32)).expect("Stack too deep!");
+        let _program_length = program_bytecode.check_program_length(Some(248)).expect("Program too long!");
+
         self.program = Some(program_bytecode);
         self.announce_program_start();
     }

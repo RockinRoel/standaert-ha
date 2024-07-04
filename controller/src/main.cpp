@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "constants.hpp"
-#include "errors.hpp"
+#include "messages.hpp"
 #include "state.hpp"
 
 #include "collections/bitset32.hpp"
@@ -151,17 +151,20 @@ namespace StandaertHA {
           receive_program_data(state);
           finalize_program_upload(state);
         } else {
-          Comm::Serial::send_error(Errors::UNEXPECTED_PROGRAM_END_ERROR);
+          Comm::Serial::send_error(Messages::UNEXPECTED_PROGRAM_END_ERROR);
           Comm::Serial::send_program_end_ack(state.program.header());
         }
+        break;
       }
       case Comm::MessageType::ProgramData: {
         if (state.upload_state.uploading) {
           receive_program_data(state);
         } else {
-          Comm::Serial::send_error(Errors::UNEXPECTED_PROGRAM_DATA_ERROR);
+          Comm::Serial::send_error(Messages::UNEXPECTED_PROGRAM_DATA_ERROR);
         }
+        break;
       }
+      default: {}
     }
   }
 
@@ -169,11 +172,11 @@ namespace StandaertHA {
     uint32_t new_size = static_cast<uint32_t>(state.upload_state.position) + static_cast<uint32_t>(state.message.body_length());
     bool size_error = false;
     if (new_size > static_cast<uint32_t>(Shal::Interpreter::MAX_CODE_SIZE)) {
-      Comm::Serial::send_error(Errors::MAXIMUM_CODE_SIZE_ERROR);
+      Comm::Serial::send_error(Messages::MAXIMUM_CODE_SIZE_ERROR);
       size_error = true;
     }
     if (!size_error && new_size > static_cast<uint32_t>(state.program.header().length())) {
-      Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
+      Comm::Serial::send_error(Messages::CODE_SIZE_MISMATCH_ERROR);
       size_error = true;
     }
     if (size_error) {
@@ -197,14 +200,14 @@ namespace StandaertHA {
     state.upload_state.uploading = false;
     state.upload_state.position = 0;
     if (program_size != static_cast<uint32_t>(state.program.header().length())) {
-      Comm::Serial::send_error(Errors::CODE_SIZE_MISMATCH_ERROR);
+      Comm::Serial::send_error(Messages::CODE_SIZE_MISMATCH_ERROR);
       state.program.load();
       Comm::Serial::send_program_end_ack(state.program.header());
       return;
     }
     if (!state.program.verify()) {
       // Error: reload from EEPROM
-      Comm::Serial::send_error(Errors::PROGRAM_VERIFICATION_ERROR);
+      Comm::Serial::send_error(Messages::PROGRAM_VERIFICATION_ERROR);
       state.program.load();
       Comm::Serial::send_program_end_ack(state.program.header());
       return;

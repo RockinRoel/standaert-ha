@@ -55,19 +55,19 @@ namespace StandaertHA::Shal::Bytecode {
   static_assert(INSTR_IF_MASK     == 0b0011'1000U);
 
   constexpr bool is_single_byte(uint8_t byte) {
-    return (byte & FIRST_BYTE_PREFIX) == 0;
+    return (byte & FIRST_BYTE_PREFIX) != FIRST_BYTE_PREFIX;
   }
 
   constexpr bool is_dual_byte(uint8_t byte) {
-    return (byte & FIRST_BYTE_PREFIX) != 0;
+    return (byte & FIRST_BYTE_PREFIX) == FIRST_BYTE_PREFIX;
   }
 
   constexpr bool is_first_byte(uint8_t byte) {
-    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) == 0;
+    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) != SECOND_BYTE_PREFIX;
   }
 
   constexpr bool is_second_byte(uint8_t byte) {
-    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) != 0;
+    return is_dual_byte(byte) && (byte & SECOND_BYTE_PREFIX) == SECOND_BYTE_PREFIX;
   }
 
 }

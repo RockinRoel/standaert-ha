@@ -76,6 +76,16 @@ Message::Message(const FailMsg& fail_msg, uint8_t size) noexcept
   crc_ = calc_crc();
 }
 
+Message::Message(const InfoMsg& info_msg, uint8_t size) noexcept
+  : body_{
+    .info_msg = info_msg,
+  },
+  type_(MessageType::Info)
+{
+  body_length_ = size;
+  crc_ = calc_crc();
+}
+
 Message::Message(const ProgramStart& program_start) noexcept
   : body_{
       .program_start = program_start,

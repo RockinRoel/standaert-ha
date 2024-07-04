@@ -15,6 +15,9 @@
 
 #include "shal/interpreter.hpp"
 
+#include "comm/serial.hpp"
+#include "messages.hpp"
+
 #include <Arduino.h>
 
 #include <avr/eeprom.h>
@@ -144,11 +147,13 @@ namespace StandaertHA::Shal::Interpreter {
           break;
         default:
           state.new_output_ = state.old_output_;
+          Comm::Serial::send_error(Messages::UNKNOWN_INSTRUCTION);
           return false;
         }
       } else if (is_second_byte(byte)) {
         if (!is_first_byte(prevByte)) {
           state.new_output_ = state.old_output_;
+          Comm::Serial::send_error(Messages::PREVIOUS_BYTE_ERROR);
           return false;
         }
         const uint8_t value = byte & DUAL_BYTE_MASK;
@@ -180,15 +185,18 @@ namespace StandaertHA::Shal::Interpreter {
           );
         } else {
           state.new_output_ = state.old_output_;
+          Comm::Serial::send_error(Messages::UNKNOWN_INSTRUCTION);
           return false;
         }
       } else if (!is_first_byte(byte)) {
         state.new_output_ = state.old_output_;
+        Comm::Serial::send_error(Messages::UNKNOWN_INSTRUCTION);
         return false;
       }
       prevByte = byte;
     }
     state.new_output_ = state.old_output_;
+    Comm::Serial::send_error(Messages::END_OF_PROGRAM);
     return false;
   }
 
