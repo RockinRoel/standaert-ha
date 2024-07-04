@@ -3,12 +3,12 @@ use crate::controller::program_header::ProgramHeaderDecodeError::{
 };
 use thiserror::Error;
 
-const PROGRAM_HEADER_LENGTH: usize = 8;
+pub const PROGRAM_HEADER_LENGTH: usize = 8;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ProgramHeader {
-    length: u16,
-    crc: u16,
+    pub length: u16,
+    pub crc: u16,
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]

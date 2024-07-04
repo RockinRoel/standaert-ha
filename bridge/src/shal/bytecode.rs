@@ -1,3 +1,4 @@
+use crate::controller::program_header::ProgramHeader;
 use crate::shal::ast::SourceLoc;
 use crate::shal::common::{Edge, IsWas, Value};
 use crc::{Crc, CRC_16_XMODEM};
@@ -169,6 +170,21 @@ pub(super) enum Instruction {
 pub(crate) struct DecodingError {}
 
 impl Instruction {
+    fn byte_size(&self) -> usize {
+        match *self {
+            Instruction::End
+            | Instruction::And
+            | Instruction::Or
+            | Instruction::Xor
+            | Instruction::Not
+            | Instruction::Pop => 1,
+            Instruction::Set { .. }
+            | Instruction::Toggle { .. }
+            | Instruction::On { .. }
+            | Instruction::If { .. } => 2,
+        }
+    }
+
     fn encode(&self) -> InstructionEncoding {
         match *self {
             Instruction::End => InstructionEncoding::single_byte(INSTR_END),
@@ -326,17 +342,7 @@ impl Program {
     ) -> Result<usize, ProgramSizeError> {
         let mut length = 0;
         for (i, instr) in self.instructions.iter().enumerate() {
-            match instr {
-                Instruction::Toggle { .. }
-                | Instruction::On { .. }
-                | Instruction::If { .. }
-                | Instruction::Set { .. } => {
-                    length += 2;
-                }
-                _ => {
-                    length += 1;
-                }
-            }
+            length += instr.byte_size();
             if let Some(limit) = limit {
                 if length > limit {
                     return Err(ProgramSizeError {
@@ -346,6 +352,31 @@ impl Program {
             }
         }
         Ok(length)
+    }
+
+    pub(crate) fn calc_length(&self) -> usize {
+        self.check_program_length(None)
+            .expect("Check program length without limit yielded error?")
+    }
+
+    pub(crate) fn calc_crc(&self) -> u16 {
+        let crc = Crc::<u16>::new(&CRC_16_XMODEM);
+        let mut digest = crc.digest();
+        for instr in &self.instructions {
+            let encoding = instr.encode();
+            match encoding {
+                InstructionEncoding::SingleByte(b) => digest.update(&[b]),
+                InstructionEncoding::DualByte(b1, b2) => digest.update(&[b1, b2]),
+            }
+        }
+        digest.finalize()
+    }
+
+    pub(crate) fn header(&self) -> ProgramHeader {
+        ProgramHeader {
+            length: self.calc_length() as u16, // TODO(Roel): ???
+            crc: self.calc_crc(),
+        }
     }
 }
 

@@ -1,76 +1,76 @@
-on redge input 1 toggle output 4;
+on fedge input 1 toggle output 4;
 
-on redge input 2 toggle output 3;
+on fedge input 2 toggle output 3;
 
-on redge input 3 toggle output 24;
+on fedge input 3 toggle output 24;
 
-on redge input 4 toggle output 2;
+on fedge input 4 toggle output 2;
 
-on redge input 5 toggle output 1;
+on fedge input 5 toggle output 1;
 
-on redge input 6 toggle output 17;
+on fedge input 6 toggle output 17;
 
-on redge input 7 toggle output 20;
+on fedge input 7 toggle output 20;
 
-on redge input 8 toggle output 13;
+on fedge input 8 toggle output 13;
 
-on redge input 9 toggle output 16;
+on fedge input 9 toggle output 16;
 
-on redge input 10 toggle output 6;
+on fedge input 10 toggle output 6;
 
-on redge input 12 {
+on fedge input 12 {
   toggle output 6;
   toggle output 26;
 }
 
-on redge input 13 toggle output 7;
+on fedge input 13 toggle output 7;
 
-on redge input 14 {
+on fedge input 14 {
   toggle output 6;
   toggle output 26;
 }
 
-on redge input 15 toggle output 31;
+on fedge input 15 toggle output 31;
 
-on redge input 16 toggle output 20;
+on fedge input 16 toggle output 20;
 
-on redge input 17 {
+on fedge input 17 {
   toggle output 6;
   toggle output 26;
 }
 
-on redge input 17 {
+on fedge input 17 {
   toggle output 28;
   toggle output 29;
 }
 
-on redge input 18 toggle output 26;
+on fedge input 18 toggle output 26;
 
-on redge input 19 toggle output 11;
+on fedge input 19 toggle output 11;
 
-on redge input 20 toggle output 30;
+on fedge input 20 toggle output 30;
 
-on redge input 21 toggle output 8;
+on fedge input 21 toggle output 8;
 
-on redge input 22 toggle output 18;
+on fedge input 22 toggle output 18;
 
-on redge input 23 toggle output 14;
+on fedge input 23 toggle output 14;
 
-on redge input 24 toggle output 15;
+on fedge input 24 toggle output 15;
 
-on redge input 25 toggle output 15;
+on fedge input 25 toggle output 15;
 
-on redge input 26 toggle output 12;
+on fedge input 26 toggle output 12;
 
-on redge input 27 toggle output 27;
+on fedge input 27 toggle output 27;
 
-on redge input 28 toggle output 12;
+on fedge input 28 toggle output 12;
 
-on redge input 29 toggle output 10;
+on fedge input 29 toggle output 10;
 
-on redge input 30 toggle output 15;
+on fedge input 30 toggle output 15;
 
-on redge input 31 toggle output 23;
+on fedge input 31 toggle output 23;
 
 // Staircase lighting
 if output 5 is high or output 20 is high {

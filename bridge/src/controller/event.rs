@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::controller::event::Event::{FallingEdge, RisingEdge};
+use thiserror::Error;
 
 const FEDGE_EVENT: u8 = 0b0010_0000;
 const REDGE_EVENT: u8 = 0b0110_0000;

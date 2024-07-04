@@ -1,9 +1,11 @@
-use std::string::FromUtf8Error;
 use static_assertions as sa;
+use std::string::FromUtf8Error;
 
-use crate::controller::event::{Event, EventDecodeError};
 use crate::controller::command::{Command, CommandDecodeError};
-use crate::controller::message::MessageDecodingError::{CrcError, SizeTooLarge, SizeTooSmall, UnknownType};
+use crate::controller::event::{Event, EventDecodeError};
+use crate::controller::message::MessageDecodingError::{
+    CrcError, SizeTooLarge, SizeTooSmall, UnknownType,
+};
 use crate::controller::program_header::{ProgramHeader, ProgramHeaderDecodeError};
 use crc::{Crc, CRC_16_XMODEM};
 use thiserror::Error;
@@ -11,7 +13,7 @@ use thiserror::Error;
 const MESSAGE_HEADER_LENGTH: usize = 3;
 const MIN_MESSAGE_LENGTH: usize = MESSAGE_HEADER_LENGTH;
 const MAX_MESSAGE_LENGTH: usize = 128;
-const MAX_MESSAGE_BODY_LENGTH: usize = MAX_MESSAGE_LENGTH - MESSAGE_HEADER_LENGTH;
+pub const MAX_MESSAGE_BODY_LENGTH: usize = MAX_MESSAGE_LENGTH - MESSAGE_HEADER_LENGTH;
 
 sa::const_assert_eq!(MIN_MESSAGE_LENGTH, 3);
 sa::const_assert_eq!(MAX_MESSAGE_BODY_LENGTH, 125);
@@ -19,19 +21,13 @@ sa::const_assert_eq!(MAX_MESSAGE_BODY_LENGTH, 125);
 #[derive(Error, Debug, Eq, PartialEq)]
 pub(crate) enum MessageDecodingError {
     #[error("Size too small, message size should be at least {MIN_MESSAGE_LENGTH}, actual size: {actual_size}")]
-    SizeTooSmall {
-        actual_size: usize,
-    },
+    SizeTooSmall { actual_size: usize },
     #[error("Size too large, message size should be at most {MAX_MESSAGE_LENGTH}, actual size: {actual_size}")]
-    SizeTooLarge {
-        actual_size: usize,
-    },
+    SizeTooLarge { actual_size: usize },
     #[error("CRC error")]
     CrcError,
     #[error("Unknown message type ({type_byte})")]
-    UnknownType {
-        type_byte: u8,
-    },
+    UnknownType { type_byte: u8 },
     #[error("Error decoding event")]
     EventDecodeError(#[from] EventDecodeError),
     #[error("Error decoding command")]
@@ -50,7 +46,7 @@ pub(crate) enum MessageDecodingError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Message {
     crc: u16,
-    body: MessageBody,
+    pub body: MessageBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -129,9 +125,7 @@ impl MessageBody {
                     digest.update(&[command_byte]);
                 }
             }
-            Fail { message } | Info { message } => {
-                digest.update(message.as_bytes())
-            }
+            Fail { message } | Info { message } => digest.update(message.as_bytes()),
             ProgramStart { header } | ProgramStartAck { header } | ProgramEndAck { header } => {
                 let header_bytes: [u8; ProgramHeader::header_length()] = header.into();
                 digest.update(&header_bytes);
@@ -194,18 +188,18 @@ impl TryFrom<&[u8]> for Message {
                     body: MessageBody::Command { commands },
                 })
             }
-            b'F' => {
-                Ok(Message {
-                    crc: read_crc,
-                    body: MessageBody::Fail { message: String::from_utf8(body.to_vec())? },
-                })
-            }
-            b'I' => {
-                Ok(Message {
-                    crc: read_crc,
-                    body: MessageBody::Info { message: String::from_utf8(body.to_vec())? },
-                })
-            }
+            b'F' => Ok(Message {
+                crc: read_crc,
+                body: MessageBody::Fail {
+                    message: String::from_utf8(body.to_vec())?,
+                },
+            }),
+            b'I' => Ok(Message {
+                crc: read_crc,
+                body: MessageBody::Info {
+                    message: String::from_utf8(body.to_vec())?,
+                },
+            }),
             b's' if body.len() == ProgramHeader::header_length() => {
                 let header = body.try_into()?;
                 Ok(Message {
@@ -235,9 +229,7 @@ impl TryFrom<&[u8]> for Message {
                     body: MessageBody::ProgramEndAck { header },
                 })
             }
-            _ => Err(UnknownType {
-                type_byte,
-            })
+            _ => Err(UnknownType { type_byte }),
         }
     }
 }
@@ -271,8 +263,7 @@ impl From<&MessageBody> for Vec<u8> {
                 }
                 result
             }
-            MessageBody::Fail { message }
-            | MessageBody::Info { message } => {
+            MessageBody::Fail { message } | MessageBody::Info { message } => {
                 message.as_bytes().into()
             }
             MessageBody::ProgramStart { header }

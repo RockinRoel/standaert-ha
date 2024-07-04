@@ -1,5 +1,5 @@
+use crate::controller::command::Command::{Off, On, Toggle};
 use thiserror::Error;
-use crate::controller::command::Command::{Toggle, On, Off};
 
 const COMMAND_TYPE_MASK: u8 = 0b1110_0000;
 const OUTPUT_MASK: u8 = 0b0001_1111;
