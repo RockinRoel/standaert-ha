@@ -7,7 +7,6 @@ use crate::handlers::message::Message::ReceivedFromController;
 use crate::handlers::programmer::State::Neutral;
 use crate::shal::bytecode::Program;
 use crate::shal::{compiler, parser};
-use std::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 
 enum State {
@@ -41,8 +40,12 @@ impl Programmer {
             std::fs::read_to_string(&self.program_path).expect("Failed to read program!");
         let program_ast = parser::parse(&program_str).expect("Failed to parse program!");
         let program_bytecode = compiler::compile(&program_ast).expect("Failed to compile program!");
-        let _stack_depth = program_bytecode.check_stack_depth(Some(32)).expect("Stack too deep!");
-        let _program_length = program_bytecode.check_program_length(Some(248)).expect("Program too long!");
+        let _stack_depth = program_bytecode
+            .check_stack_depth(Some(32))
+            .expect("Stack too deep!");
+        let _program_length = program_bytecode
+            .check_program_length(Some(248))
+            .expect("Program too long!");
 
         self.program = Some(program_bytecode);
         self.announce_program_start();

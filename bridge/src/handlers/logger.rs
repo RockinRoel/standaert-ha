@@ -1,4 +1,4 @@
-use crate::handlers::handler::{Handler, HandleResult};
+use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
 
 pub struct Logger;

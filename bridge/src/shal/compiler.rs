@@ -4,7 +4,6 @@ use crate::shal::compiler::CompileError::{DuplicateEntityError, UnknownEntityErr
 use crate::shal::compiler::InOut::{Input, Output};
 use crate::shal::{ast, bytecode};
 use std::collections::HashMap;
-use std::fmt::Display;
 use thiserror::Error;
 
 enum InOut {

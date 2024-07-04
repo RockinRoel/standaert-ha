@@ -1,16 +1,16 @@
-use tokio::sync::mpsc::UnboundedSender;
-use slip_codec::tokio::SlipCodec;
-use futures::SinkExt;
-use futures::stream::StreamExt;
-use tokio::task::JoinHandle;
-use tokio_serial::{SerialPortBuilderExt, SerialStream};
-use tokio_util::codec::{Decoder, Framed};
-use tokio_util::sync::CancellationToken;
 use crate::controller;
 use crate::controller::message::MessageBody;
-use crate::handlers::handler::{Handler, HandleResult};
 use crate::handlers::handler::HandleResult::Continue;
+use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
+use futures::stream::StreamExt;
+use futures::SinkExt;
+use slip_codec::tokio::SlipCodec;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio::task::JoinHandle;
+use tokio_serial::SerialPortBuilderExt;
+use tokio_util::codec::Decoder;
+use tokio_util::sync::CancellationToken;
 
 const BAUD_RATE: u32 = 115_200;
 
@@ -22,11 +22,14 @@ pub struct SerialHandler {
 
 impl SerialHandler {
     pub fn new(serial_port: String, sender: UnboundedSender<Message>) -> Self {
-        let (serial_sender, mut serial_receiver) = tokio::sync::mpsc::unbounded_channel::<MessageBody>();
+        let (serial_sender, mut serial_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<MessageBody>();
         let cancellation_token = CancellationToken::new();
         let cancellation_token_clone = cancellation_token.clone();
         let task = tokio::spawn(async move {
-            let serial_stream = tokio_serial::new(serial_port, BAUD_RATE).open_native_async().expect("Failed to open serial port!");
+            let serial_stream = tokio_serial::new(serial_port, BAUD_RATE)
+                .open_native_async()
+                .expect("Failed to open serial port!");
             let mut framed_port = SlipCodec::new().framed(serial_stream);
             loop {
                 tokio::select! {

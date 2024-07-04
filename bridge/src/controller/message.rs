@@ -133,7 +133,6 @@ impl MessageBody {
             ProgramData { code } | ProgramEnd { code } => {
                 digest.update(code);
             }
-            _ => {}
         }
         digest.finalize()
     }

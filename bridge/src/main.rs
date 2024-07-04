@@ -2,29 +2,29 @@ pub mod controller;
 pub mod handlers;
 pub mod shal;
 
-use std::sync::mpsc;
-use crate::handlers::handler::Handler;
-use crate::handlers::handler_chain::HandlerChain;
+use std::fmt::{Display, Formatter};
 use crate::controller::command::Command;
 use crate::controller::message::{Message, MessageBody};
+use crate::handlers::handler::Handler;
+use crate::handlers::handler_chain::HandlerChain;
+use crate::handlers::logger::Logger;
+use crate::handlers::programmer::Programmer;
+use crate::handlers::serial_handler::SerialHandler;
 use anyhow::Result;
 use clap::Parser;
-use crc::{Crc, CRC_16_XMODEM};
 use futures::stream::StreamExt;
 use futures::SinkExt;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use slip_codec::tokio::SlipCodec;
 use std::time::Duration;
 use tokio::signal;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
 use tokio_serial::SerialPortBuilderExt;
 use tokio_util::codec::Decoder;
 use tokio_util::sync::CancellationToken;
-use crate::handlers::logger::Logger;
-use crate::handlers::programmer::Programmer;
-use crate::handlers::serial_handler::SerialHandler;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -64,6 +64,37 @@ struct Args {
     /// Verbose
     #[arg(long, default_value_t = false, env = "SHA_DEBUG")]
     debug: bool,
+}
+
+impl Display for Args {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(mqtt_host) = &self.mqtt_host {
+            writeln!(f, "  MQTT options:")?;
+            writeln!(f, "    host: {}", mqtt_host)?;
+            if let Some(mqtt_user) = &self.mqtt_user {
+                writeln!(f, "    user: {}", mqtt_user)?;
+            } else {
+                writeln!(f, "    user: <none>")?;
+            }
+            writeln!(f, "    password: {}", if self.mqtt_password.is_some() { "***" } else { "<none>" })?;
+            writeln!(f, "    tls: {}", if self.mqtt_use_tls { "enabled" } else { "disabled" })?;
+            writeln!(f, "    prefix: {}", self.prefix)?;
+            writeln!(f, "    node id: {}", self.id)?;
+        } else {
+            writeln!(f, "  MQTT: disabled")?;
+        }
+        if let Some(serial) = &self.serial {
+            writeln!(f, "  Serial port: {}", serial)?;
+        } else {
+            writeln!(f, "  Serial: <disabled>")?;
+        }
+        if let Some(program) = &self.program {
+            writeln!(f, "  Program path: {}", program)?;
+        } else {
+            writeln!(f, "  Program: <disabled>")?;
+        }
+        writeln!(f, "  Debug: {}", if self.debug { "enabled" } else { "disabled" })
+    }
 }
 
 const BAUD_RATE: u32 = 115200;
@@ -169,7 +200,7 @@ async fn do_logging(
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    println!("Args: {:?}", args);
+    println!("Starting SHA bridge with arguments:\n{}", args);
 
     let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -191,11 +222,19 @@ async fn main() -> Result<()> {
         // TODO(Roel): add MQTT
     }
 
-    sender.send(handlers::message::Message::ReloadProgram).expect("Could not send reload?"); // TODO(Roel): ???
+    sender
+        .send(handlers::message::Message::ReloadProgram)
+        .unwrap_or_else(|_| unreachable!());
 
-    sender.send(handlers::message::Message::SendToController(MessageBody::Command {
-        commands: vec![Command::Refresh],
-    })).expect("Could not send refresh?"); // TODO(Roel): ???
+    sender
+        .send(handlers::message::Message::SendToController(
+            MessageBody::Command {
+                commands: vec![Command::Refresh],
+            },
+        ))
+        .unwrap_or_else(|_| unreachable!());
+
+    let mut hup_stream = signal(SignalKind::hangup())?;
 
     loop {
         tokio::select! {
@@ -209,8 +248,13 @@ async fn main() -> Result<()> {
                     // TODO(Roel): ???
                 }
             },
+            _ = hup_stream.recv() => {
+                sender.send(handlers::message::Message::ReloadProgram)
+                .unwrap_or_else(|_| unreachable!());
+            },
             _ = signal::ctrl_c() => {
-                sender.send(handlers::message::Message::Stop).expect("Could not send stop?"); // TODO(Roel): ???
+                sender.send(handlers::message::Message::Stop)
+                .unwrap_or_else(|_| unreachable!());
             }
         }
     }
