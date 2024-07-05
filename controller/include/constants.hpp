@@ -54,6 +54,6 @@ namespace StandaertHA::Constants {
 
     constexpr const unsigned long int DEBOUNCE_TIME_MILLIS = 30UL;
 
-    constexpr const unsigned long int SERIAL_BAUD_RATE = 115'200UL;
+    constexpr const unsigned long int SERIAL_BAUD_RATE = 9600UL;
 
 } // StandaertHA::Constants
