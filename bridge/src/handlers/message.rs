@@ -1,9 +1,9 @@
-use crate::controller;
+use crate::controller::message::MessageBody;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {
     ReloadProgram,
-    ReceivedFromController(controller::message::MessageBody),
-    SendToController(controller::message::MessageBody),
+    ReceivedFromController(MessageBody),
+    SendToController(MessageBody),
     Stop,
 }

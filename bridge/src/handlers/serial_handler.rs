@@ -1,5 +1,5 @@
 use crate::controller;
-use crate::controller::message::MessageBody;
+use crate::controller::message::{MAX_MESSAGE_BODY_LENGTH, MessageBody};
 use crate::handlers::handler::HandleResult::Continue;
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
@@ -12,7 +12,7 @@ use tokio_serial::SerialPortBuilderExt;
 use tokio_util::codec::Decoder;
 use tokio_util::sync::CancellationToken;
 
-const BAUD_RATE: u32 = 115_200;
+const BAUD_RATE: u32 = 9600;
 
 pub struct SerialHandler {
     task: JoinHandle<()>,
@@ -44,8 +44,30 @@ impl SerialHandler {
                     },
                     message = serial_receiver.recv() => {
                         if let Some(message) = message {
-                            let bytes: Vec<u8> = (&controller::message::Message::new(message)).into();
-                            framed_port.send(bytes.into()).await.expect("Failed to send serial message?"); // TODO(Roel): what about this error?
+                            let mut messages = vec![message];
+                            while let Ok(message) = serial_receiver.try_recv() {
+                                messages.push(message);
+                            }
+                            let mut commands = vec![];
+                            for message in messages {
+                                match message {
+                                    MessageBody::Command { commands: mut commands2 } => {
+                                        commands.append(&mut commands2);
+                                    }
+                                    _ => {
+                                        let bytes: Vec<u8> = (&controller::message::Message::new(message)).into();
+                                        framed_port.send(bytes.into()).await.expect("Failed to send serial message?"); // TODO(Roel): what about this error?
+                                    }
+                                }
+                            }
+                            for commands_chunk in commands.chunks(MAX_MESSAGE_BODY_LENGTH) {
+                                let message = MessageBody::Command {
+                                    commands: commands_chunk.to_vec(),
+                                };
+                                println!("Commands message: {:?}", commands);
+                                let bytes: Vec<u8> = (&controller::message::Message::new(message)).into();
+                                framed_port.send(bytes.into()).await.expect("Failed to send serial message?"); // TODO(Roel): what about this error?
+                            }
                         } else {
                             // TODO(Roel): ???
                         }

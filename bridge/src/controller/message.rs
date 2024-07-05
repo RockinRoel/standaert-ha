@@ -19,7 +19,7 @@ sa::const_assert_eq!(MIN_MESSAGE_LENGTH, 3);
 sa::const_assert_eq!(MAX_MESSAGE_BODY_LENGTH, 125);
 
 #[derive(Error, Debug, Eq, PartialEq)]
-pub(crate) enum MessageDecodingError {
+pub enum MessageDecodingError {
     #[error("Size too small, message size should be at least {MIN_MESSAGE_LENGTH}, actual size: {actual_size}")]
     SizeTooSmall { actual_size: usize },
     #[error("Size too large, message size should be at most {MAX_MESSAGE_LENGTH}, actual size: {actual_size}")]
@@ -44,13 +44,13 @@ pub(crate) enum MessageDecodingError {
 // body: at most 128 - 3 = 125 bytes
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Message {
+pub struct Message {
     crc: u16,
     pub body: MessageBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum MessageBody {
+pub enum MessageBody {
     Update {
         outputs: u32,
         events: Vec<Event>,

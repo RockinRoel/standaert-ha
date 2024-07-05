@@ -1,7 +1,7 @@
 use crate::shal::common::{Edge, IsWas, Value};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) struct SourceLoc {
+pub struct SourceLoc {
     start: usize,
     end: usize,
 }

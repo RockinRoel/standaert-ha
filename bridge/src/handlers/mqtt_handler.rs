@@ -1,4 +1,4 @@
-use std::fmt::{Debug, format};
+use std::fmt::Debug;
 use crate::controller::message::MessageBody;
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
@@ -57,7 +57,7 @@ impl MqttHandler {
         let cancellation_token = CancellationToken::new();
         let (mqtt_sender, mqtt_receiver) =
             tokio::sync::mpsc::unbounded_channel::<MessageBody>();
-        let (mut client, mut event_loop) = AsyncClient::new(options.clone(), 10);
+        let (client, event_loop) = AsyncClient::new(options.clone(), 10);
         let mut client_task = MqttHandlerClientTask {
             client: client.clone(),
             mqtt_receiver,
@@ -133,10 +133,9 @@ impl MqttHandlerClientTask {
         for i in 0..32 {
             let prefix = format!("{}/binary_sensor/{}/{}", self.prefix, self.options.client_id(), i);
             let discovery_topic = format!("{}/config", prefix);
-            let availability_topic = format!("{}/availability", prefix);
             let state_topic = format!("{}/pressed", prefix);
             let spec = BinarySensorSpec {
-                availability_topic: availability_topic.clone(),
+                unique_id: format!("{}_input_{}", self.options.client_id(), i),
                 name: format!("Standaert Home Automation button #{}", i),
                 icon: "mdi:light-switch-off".to_string(),
                 state_topic: state_topic.clone(),
@@ -148,12 +147,6 @@ impl MqttHandlerClientTask {
                 serde_json::to_string(&spec).unwrap(),
             ).await.unwrap();
             self.client.publish(
-                availability_topic,
-                QoS::AtLeastOnce,
-                true,
-                "available"
-            ).await.unwrap();
-            self.client.publish(
                 state_topic,
                 QoS::AtLeastOnce,
                 true,
@@ -163,12 +156,11 @@ impl MqttHandlerClientTask {
         // Announce lights
         for i in 0..32 {
             let prefix = format!("{}/light/{}/{}", self.prefix, self.options.client_id(), i);
-            let availability_topic = format!("{}/availability", prefix);
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/status", prefix);
             let command_topic = format!("{}/switch", prefix);
             let spec = LightSpec {
-                availability_topic: availability_topic.clone(),
+                unique_id: format!("{}_output_{}", self.options.client_id(), i),
                 name: format!("Standaert Home Automation light #{}", i),
                 state_topic: state_topic.clone(),
                 command_topic: command_topic.clone(),
@@ -178,12 +170,6 @@ impl MqttHandlerClientTask {
                 QoS::AtLeastOnce,
                 true,
                 serde_json::to_string(&spec).unwrap(),
-            ).await.unwrap();
-            self.client.publish(
-                availability_topic,
-                QoS::AtLeastOnce,
-                true,
-                "available"
             ).await.unwrap();
             self.client.publish(
                 state_topic,
@@ -202,7 +188,7 @@ impl MqttHandlerClientTask {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BinarySensorSpec {
-    availability_topic: String,
+    unique_id: String,
     name: String,
     icon: String,
     state_topic: String,
@@ -210,7 +196,7 @@ struct BinarySensorSpec {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LightSpec {
-    availability_topic: String,
+    unique_id: String,
     name: String,
     command_topic: String,
     state_topic: String,
@@ -227,7 +213,7 @@ impl MqttHandlerEventLoopTask {
                             if let Some(suffix) = publish.topic.strip_prefix(&prefix) {
                                 if let Some(id) = suffix.strip_suffix("/switch") {
                                     if let Ok(id) = id.parse::<u8>() {
-                                        if id >= 0 && id < 32 {
+                                        if id < 32 {
                                             if let Ok(payload) = String::from_utf8(publish.payload.to_vec()) {
                                                 match &payload[..] {
                                                     "ON" => {

@@ -9,7 +9,7 @@ const OFF_COMMAND: u8 = 0b1000_0000;
 const ON_COMMAND: u8 = 0b1100_0000;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Command {
+pub enum Command {
     Refresh,
     Toggle(u8),
     Off(u8),
@@ -22,7 +22,7 @@ pub struct OutputOutOfRange;
 
 #[derive(Debug, Error, Eq, PartialEq)]
 #[error("Error decoding command")]
-pub(crate) struct CommandDecodeError;
+pub struct CommandDecodeError;
 
 impl Command {
     pub fn refresh() -> Self {

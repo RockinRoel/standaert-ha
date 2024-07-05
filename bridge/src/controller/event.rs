@@ -7,7 +7,7 @@ const EVENT_TYPE_MASK: u8 = 0b1110_0000;
 const INPUT_MASK: u8 = 0b0001_1111;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Event {
+pub enum Event {
     RisingEdge(u8),
     FallingEdge(u8),
 }

@@ -6,13 +6,13 @@ use thiserror::Error;
 pub const PROGRAM_HEADER_LENGTH: usize = 8;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ProgramHeader {
+pub struct ProgramHeader {
     pub length: u16,
     pub crc: u16,
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]
-pub(crate) enum ProgramHeaderDecodeError {
+pub enum ProgramHeaderDecodeError {
     #[error("Incorrect header size: should be 8, was {actual_size}")]
     IncorrectHeaderSize { actual_size: usize },
     #[error(
