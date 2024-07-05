@@ -8,7 +8,7 @@ authors = ["Roel Standaert <roel@arres.be>"]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-rumqttc = "0.24"
+rumqttc = { version = "0.24", features = ["url"] }
 tokio-serial = "5.4"
 pest = "2.7"
 pest_derive = "2.7"
@@ -20,3 +20,5 @@ tokio-util = { version = "0.7", features = ["codec"] }
 slip-codec = { version = "0.4", features = ["tokio-codec"] }
 futures = "0.3"
 crc = "3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

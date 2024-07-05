@@ -2,12 +2,12 @@ pub mod controller;
 pub mod handlers;
 pub mod shal;
 
-use std::fmt::{Display, Formatter};
 use crate::controller::command::Command;
 use crate::controller::message::{Message, MessageBody};
 use crate::handlers::handler::Handler;
 use crate::handlers::handler_chain::HandlerChain;
 use crate::handlers::logger::Logger;
+use crate::handlers::mqtt_handler::MqttHandler;
 use crate::handlers::programmer::Programmer;
 use crate::handlers::serial_handler::SerialHandler;
 use anyhow::Result;
@@ -16,6 +16,7 @@ use futures::stream::StreamExt;
 use futures::SinkExt;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use slip_codec::tokio::SlipCodec;
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
@@ -30,8 +31,8 @@ use tokio_util::sync::CancellationToken;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// MQTT broker host
-    #[arg(long, env = "SHA_MQTT_HOST")]
-    mqtt_host: Option<String>,
+    #[arg(long, env = "SHA_MQTT_URL")]
+    mqtt_url: Option<String>,
 
     /// MQTT broker user
     #[arg(long, env = "SHA_MQTT_USER")]
@@ -41,17 +42,9 @@ struct Args {
     #[arg(long, env = "SHA_MQTT_PASSWORD")]
     mqtt_password: Option<String>,
 
-    /// Use TLS for MQTT?
-    #[arg(long, default_value_t = false, env = "SHA_MQTT_USE_TLS")]
-    mqtt_use_tls: bool,
-
     /// Home assistant discovery prefix
     #[arg(long, default_value = "homeassistant", env = "SHA_DISCOVERY_PREFIX")]
     prefix: String,
-
-    /// Node id
-    #[arg(long, default_value = "standaert_ha", env = "SHA_NODE_ID")]
-    id: String,
 
     /// Serial device
     #[arg(long, env = "SHA_SERIAL_DEVICE")]
@@ -68,18 +61,24 @@ struct Args {
 
 impl Display for Args {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(mqtt_host) = &self.mqtt_host {
+        if let Some(mqtt_url) = &self.mqtt_url {
             writeln!(f, "  MQTT options:")?;
-            writeln!(f, "    host: {}", mqtt_host)?;
+            writeln!(f, "    URL: {}", mqtt_url)?;
             if let Some(mqtt_user) = &self.mqtt_user {
                 writeln!(f, "    user: {}", mqtt_user)?;
             } else {
                 writeln!(f, "    user: <none>")?;
             }
-            writeln!(f, "    password: {}", if self.mqtt_password.is_some() { "***" } else { "<none>" })?;
-            writeln!(f, "    tls: {}", if self.mqtt_use_tls { "enabled" } else { "disabled" })?;
+            writeln!(
+                f,
+                "    password: {}",
+                if self.mqtt_password.is_some() {
+                    "***"
+                } else {
+                    "<none>"
+                }
+            )?;
             writeln!(f, "    prefix: {}", self.prefix)?;
-            writeln!(f, "    node id: {}", self.id)?;
         } else {
             writeln!(f, "  MQTT: disabled")?;
         }
@@ -93,7 +92,11 @@ impl Display for Args {
         } else {
             writeln!(f, "  Program: <disabled>")?;
         }
-        writeln!(f, "  Debug: {}", if self.debug { "enabled" } else { "disabled" })
+        writeln!(
+            f,
+            "  Debug: {}",
+            if self.debug { "enabled" } else { "disabled" }
+        )
     }
 }
 
@@ -218,8 +221,18 @@ async fn main() -> Result<()> {
         chain.add_handler(Programmer::new(program.clone(), sender.clone()));
     }
 
-    if let Some(mqtt_host) = &args.mqtt_host {
-        // TODO(Roel): add MQTT
+    if let Some(mqtt_url) = &args.mqtt_url {
+        let mut credentials = None;
+        if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
+            credentials = Some((user.clone(), password.clone()));
+        }
+        let handler = MqttHandler::new(
+            mqtt_url.clone(),
+            credentials,
+            args.prefix,
+            sender.clone(),
+        )?;
+        chain.add_handler(handler);
     }
 
     sender
@@ -242,8 +255,8 @@ async fn main() -> Result<()> {
                 if let Some(message) = message {
                     chain.handle(&message);
                     if message == handlers::message::Message::Stop {
-                            return Ok(())
-                        }
+                        return Ok(())
+                    }
                 } else {
                     // TODO(Roel): ???
                 }
