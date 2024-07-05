@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::controller::command::Command;
 use crate::controller::event::Event;
 
-// TODO(Roel): split up into client task and event loop task?
-
 pub struct MqttHandler {
     client_task: JoinHandle<()>,
     event_loop_task: JoinHandle<()>,
@@ -94,7 +92,6 @@ impl MqttHandlerClientTask {
         loop {
             select! {
                 message = self.mqtt_receiver.recv() => {
-                    // TODO(Roel): handle message from controller
                     if let Some(message) = message {
                         if let MessageBody::Update { outputs, events } = message {
                             for i in 0..32 {
@@ -120,8 +117,6 @@ impl MqttHandlerClientTask {
                                 ).await.unwrap();
                             }
                         }
-                    } else {
-                        // TODO(Roel): else?
                     }
                 },
                 _ = self.cancellation_token.cancelled() => break,
