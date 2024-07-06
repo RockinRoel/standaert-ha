@@ -15,7 +15,6 @@ use clap::Parser;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use tokio::signal;
-use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
 #[derive(Parser, Debug)]
@@ -149,8 +148,6 @@ async fn main() -> Result<()> {
 
     sleep(Duration::from_secs(1)).await;
 
-    let mut hup_stream = signal(SignalKind::hangup())?;
-
     loop {
         tokio::select! {
             message = receiver.recv() => {
@@ -162,10 +159,6 @@ async fn main() -> Result<()> {
                 } else {
                     // TODO(Roel): ???
                 }
-            },
-            _ = hup_stream.recv() => {
-                sender.send(handlers::message::Message::ReloadProgram)
-                .unwrap_or_else(|_| unreachable!());
             },
             _ = signal::ctrl_c() => {
                 sender.send(handlers::message::Message::Stop)
