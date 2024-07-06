@@ -64,7 +64,6 @@ impl SerialHandler {
                                 let message = MessageBody::Command {
                                     commands: commands_chunk.to_vec(),
                                 };
-                                println!("Commands message: {:?}", commands);
                                 let bytes: Vec<u8> = (&controller::message::Message::new(message)).into();
                                 framed_port.send(bytes.into()).await.expect("Failed to send serial message?"); // TODO(Roel): what about this error?
                             }
