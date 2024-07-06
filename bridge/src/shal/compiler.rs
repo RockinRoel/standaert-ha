@@ -5,35 +5,46 @@ use crate::shal::compiler::InOut::{Input, Output};
 use crate::shal::{ast, bytecode};
 use std::collections::HashMap;
 use thiserror::Error;
+use crate::shal::ast::SourceLoc;
 
 enum InOut {
     Input(u8),
     Output(u8),
 }
 
+fn loc_to_string(source_loc: &Option<ast::SourceLoc>) -> String {
+    if let Some(ast::SourceLoc(line, col)) = source_loc {
+        format!("line {}, col {}", line, col)
+    } else {
+        "<null>".to_string()
+    }
+}
+
 #[derive(Error, Debug, PartialEq)]
 pub enum CompileError {
-    #[error("Duplicate entity")]
+    #[error("Duplicate entity: {0} at {1}, first defined at {2}", name, loc_to_string(second_loc), loc_to_string(first_loc))]
     DuplicateEntityError {
         name: String,
         first_loc: Option<ast::SourceLoc>,
         second_loc: Option<ast::SourceLoc>,
     },
-    #[error("Unknown entity")]
+    #[error("Unknown entity: {0} at {1}", name, loc_to_string(location))]
     UnknownEntityError {
         name: String,
         location: Option<ast::SourceLoc>,
     },
 }
 
+type Entities = HashMap<String, (InOut, Option<SourceLoc>)>;
+
 fn retrieve_input(
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     input: &ast::Input,
 ) -> Result<u8, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
-            if let Some(Input(number)) = entities.get(entity_id) {
+            if let Some((Input(number), _)) = entities.get(entity_id) {
                 Ok(*number)
             } else {
                 Err(UnknownEntityError {
@@ -46,13 +57,13 @@ fn retrieve_input(
 }
 
 fn retrieve_output(
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     output: &ast::Output,
 ) -> Result<u8, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
-            if let Some(Output(number)) = entities.get(entity_id) {
+            if let Some((Output(number), _)) = entities.get(entity_id) {
                 Ok(*number)
             } else {
                 Err(UnknownEntityError {
@@ -65,12 +76,12 @@ fn retrieve_output(
 }
 
 fn retrieve_entity(
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     entity: &str,
 ) -> Result<(u8, bytecode::InOut), CompileError> {
     match entities.get(entity) {
-        Some(Input(number)) => Ok((*number, bytecode::InOut::Input)),
-        Some(Output(number)) => Ok((*number, bytecode::InOut::Output)),
+        Some((Input(number), _)) => Ok((*number, bytecode::InOut::Input)),
+        Some((Output(number), _)) => Ok((*number, bytecode::InOut::Output)),
         _ => Err(UnknownEntityError {
             name: entity.to_string(),
             location: None,
@@ -80,30 +91,30 @@ fn retrieve_entity(
 
 fn collect_entities(
     declarations: &[ast::Declaration],
-) -> Result<HashMap<String, InOut>, CompileError> {
+) -> Result<Entities, CompileError> {
     let mut result = HashMap::new();
     for declaration in declarations.iter() {
         match declaration {
-            ast::Declaration::Input { entity_id, number } => {
-                if result.contains_key(entity_id) {
+            ast::Declaration::Input { entity_id, number, source_loc } => {
+                if let Some((_, first_loc)) = result.get(entity_id) {
                     return Err(DuplicateEntityError {
                         name: entity_id.clone(),
-                        first_loc: None,
-                        second_loc: None,
+                        first_loc: *first_loc,
+                        second_loc: *source_loc,
                     });
                 } else {
-                    result.insert(entity_id.clone(), Input(*number));
+                    result.insert(entity_id.clone(), (Input(*number), *source_loc));
                 }
             }
-            ast::Declaration::Output { entity_id, number } => {
-                if result.contains_key(entity_id) {
+            ast::Declaration::Output { entity_id, number, source_loc } => {
+                if let Some((_, first_loc)) = result.get(entity_id) {
                     return Err(DuplicateEntityError {
                         name: entity_id.clone(),
-                        first_loc: None,
-                        second_loc: None,
+                        first_loc: *first_loc,
+                        second_loc: *source_loc,
                     });
                 } else {
-                    result.insert(entity_id.clone(), Output(*number));
+                    result.insert(entity_id.clone(), (Output(*number), *source_loc));
                 }
             }
         }
@@ -126,7 +137,7 @@ pub(crate) fn compile(ast_program: &ast::Program) -> Result<bytecode::Program, C
 
 fn handle_statement(
     program: &mut bytecode::Program,
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     statement: &ast::Statement,
 ) {
     match statement {
@@ -146,7 +157,7 @@ fn handle_statement(
 
 fn handle_action(
     program: &mut bytecode::Program,
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     action: &ast::Action,
 ) {
     match action {
@@ -168,7 +179,7 @@ fn handle_action(
 
 fn handle_if_else(
     program: &mut bytecode::Program,
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     condition: &ast::Condition,
     if_block: &[ast::Statement],
     else_block: &[ast::Statement],
@@ -188,7 +199,7 @@ fn handle_if_else(
 
 fn handle_condition(
     program: &mut bytecode::Program,
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     condition: &ast::Condition,
 ) {
     match condition {
@@ -243,7 +254,7 @@ fn handle_condition(
 
 fn handle_event(
     program: &mut bytecode::Program,
-    entities: &HashMap<String, InOut>,
+    entities: &Entities,
     edge: &common::Edge,
     input: &ast::Input,
     statements: &[ast::Statement],
@@ -274,22 +285,27 @@ mod tests {
                 ast::Declaration::Input {
                     entity_id: "button_downstairs".to_string(),
                     number: 0,
+                    source_loc: None,
                 },
                 ast::Declaration::Input {
                     entity_id: "button_upstairs".to_string(),
                     number: 1,
+                    source_loc: None,
                 },
                 ast::Declaration::Output {
                     entity_id: "light_downstairs".to_string(),
                     number: 0,
+                    source_loc: None,
                 },
                 ast::Declaration::Output {
                     entity_id: "light_upstairs".to_string(),
                     number: 1,
+                    source_loc: None,
                 },
                 ast::Declaration::Output {
                     entity_id: "light_stairs".to_string(),
                     number: 2,
+                    source_loc: None,
                 },
             ],
             statements: vec![

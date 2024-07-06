@@ -1,10 +1,7 @@
 use crate::shal::common::{Edge, IsWas, Value};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct SourceLoc {
-    start: usize,
-    end: usize,
-}
+pub struct SourceLoc(pub usize, pub usize);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Program {
@@ -14,8 +11,8 @@ pub(crate) struct Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Declaration {
-    Input { entity_id: String, number: u8 },
-    Output { entity_id: String, number: u8 },
+    Input { entity_id: String, number: u8, source_loc: Option<SourceLoc> },
+    Output { entity_id: String, number: u8, source_loc: Option<SourceLoc> },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

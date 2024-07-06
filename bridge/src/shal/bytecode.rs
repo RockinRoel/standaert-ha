@@ -3,8 +3,7 @@ use crate::shal::ast::SourceLoc;
 use crate::shal::common::{Edge, IsWas, Value};
 use crc::{Crc, CRC_16_XMODEM};
 use static_assertions::const_assert_eq;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
 const SET_VALUE_MASK: u8 = 0b0000_0001;
 const ON_EDGE_MASK: u8 = 0b0000_0001;
@@ -276,38 +275,16 @@ pub(crate) struct Program {
     pub(super) source_locations: Vec<SourceLoc>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Error, Debug, Eq, PartialEq)]
+#[error("Stack limit error")]
 pub(crate) struct StackLimitError {
     source_location: Option<SourceLoc>,
 }
 
-impl Display for StackLimitError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "Program size error") // TODO(Roel): details!
-    }
-}
-
-impl Error for StackLimitError {
-    fn description(&self) -> &str {
-        "Stack limit error" // TODO(Roel): details!
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Error, Debug, Eq, PartialEq)]
+#[error("Program size error")]
 pub(crate) struct ProgramSizeError {
     source_location: Option<SourceLoc>,
-}
-
-impl Display for ProgramSizeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "Program size error") // TODO(Roel): details!
-    }
-}
-
-impl Error for ProgramSizeError {
-    fn description(&self) -> &str {
-        "Program size error" // TODO(Roel): details!
-    }
 }
 
 impl Program {

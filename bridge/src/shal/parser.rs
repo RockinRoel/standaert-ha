@@ -1,4 +1,4 @@
-use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, Statement};
+use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement};
 use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -23,11 +23,8 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
         statements: vec![],
     };
 
-    if pest_program.is_none() {
-        // TODO(Roel): should this ever happen?
-        return Ok(program);
-    }
-    let pest_program = pest_program.unwrap();
+    let pest_program =
+        pest_program.expect("Fatal error: pest_program should not be none at this point");
 
     for pair in pest_program.into_inner() {
         match pair.as_rule() {
@@ -56,22 +53,26 @@ fn handle_entity_declaration(pair: Pair<Rule>) -> Declaration {
 }
 
 fn handle_input_declaration(pair: Pair<Rule>) -> Declaration {
+    let (line, col) = pair.line_col();
     let mut pairs = pair.into_inner();
     let entity_id = handle_entity_id(pairs.next().unwrap());
     let input = handle_input(pairs.next().unwrap());
     Declaration::Input {
         entity_id,
         number: input,
+        source_loc: Some(SourceLoc(line, col)),
     }
 }
 
 fn handle_output_declaration(pair: Pair<Rule>) -> Declaration {
+    let (line, col) = pair.line_col();
     let mut pairs = pair.into_inner();
     let entity_id = handle_entity_id(pairs.next().unwrap());
     let input = handle_output(pairs.next().unwrap());
     Declaration::Output {
         entity_id,
         number: input,
+        source_loc: Some(SourceLoc(line, col)),
     }
 }
 
@@ -320,7 +321,7 @@ fn handle_edge(pair: Pair<Rule>) -> Edge {
 
 #[cfg(test)]
 mod tests {
-    use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, Statement};
+    use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement};
     use crate::shal::common;
     use crate::shal::common::{IsWas, Value};
     use crate::shal::parser::parse;
@@ -333,6 +334,7 @@ mod tests {
                 declarations: vec![Declaration::Input {
                     entity_id: "button".to_string(),
                     number: 12,
+                    source_loc: Some(SourceLoc(1, 1)),
                 }],
                 statements: vec![],
             })
@@ -343,6 +345,7 @@ mod tests {
                 declarations: vec![Declaration::Output {
                     entity_id: "light".to_string(),
                     number: 5,
+                    source_loc: Some(SourceLoc(1, 1)),
                 }],
                 statements: vec![],
             })

@@ -1,5 +1,5 @@
 use crate::controller;
-use crate::controller::message::{MAX_MESSAGE_BODY_LENGTH, MessageBody};
+use crate::controller::message::{MessageBody, MAX_MESSAGE_BODY_LENGTH};
 use crate::handlers::handler::HandleResult::Continue;
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;

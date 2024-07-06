@@ -109,12 +109,7 @@ async fn main() -> Result<()> {
         if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
             credentials = Some((user.clone(), password.clone()));
         }
-        let handler = MqttHandler::new(
-            mqtt_url.clone(),
-            credentials,
-            args.prefix,
-            sender.clone(),
-        )?;
+        let handler = MqttHandler::new(mqtt_url.clone(), credentials, args.prefix, sender.clone())?;
         chain.add_handler(handler);
 
         sleep(Duration::from_secs(1)).await;

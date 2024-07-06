@@ -39,7 +39,12 @@ impl Programmer {
         let program_str =
             std::fs::read_to_string(&self.program_path).expect("Failed to read program!");
         let program_ast = parser::parse(&program_str).expect("Failed to parse program!");
-        let program_bytecode = compiler::compile(&program_ast).expect("Failed to compile program!");
+        let program_bytecode = compiler::compile(&program_ast);
+        if let Err(error) = &program_bytecode {
+            eprintln!("Compilation failed due to error: {}", error);
+            return; // TODO(Roel): return error?
+        }
+        let program_bytecode = program_bytecode.unwrap_or_else(|_| unreachable!());
         let _stack_depth = program_bytecode
             .check_stack_depth(Some(32))
             .expect("Stack too deep!");
@@ -80,11 +85,10 @@ impl Programmer {
                     .chunks(MAX_MESSAGE_BODY_LENGTH)
                     .collect();
                 let num_chunks = chunks.len();
-                for i in 0..(num_chunks - 1) {
-                    let chunk = chunks[i];
+                for chunk in chunks.iter().take(num_chunks - 1) {
                     self.sender
                         .send(Message::SendToController(MessageBody::ProgramData {
-                            code: chunk.into(),
+                            code: (*chunk).into(),
                         }))
                         .expect("Could not send?"); // TODO(Roel): how to handle?
                 }

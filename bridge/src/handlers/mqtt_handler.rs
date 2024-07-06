@@ -1,16 +1,16 @@
-use std::fmt::Debug;
+use crate::controller::command::Command;
+use crate::controller::event::Event;
 use crate::controller::message::MessageBody;
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
 use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use serde::{Deserialize, Serialize};
-use crate::controller::command::Command;
-use crate::controller::event::Event;
 
 pub struct MqttHandler {
     client_task: JoinHandle<()>,
@@ -53,8 +53,7 @@ impl MqttHandler {
             options.set_credentials(credentials.0, credentials.1);
         }
         let cancellation_token = CancellationToken::new();
-        let (mqtt_sender, mqtt_receiver) =
-            tokio::sync::mpsc::unbounded_channel::<MessageBody>();
+        let (mqtt_sender, mqtt_receiver) = tokio::sync::mpsc::unbounded_channel::<MessageBody>();
         let (client, event_loop) = AsyncClient::new(options.clone(), 10);
         let mut client_task = MqttHandlerClientTask {
             client: client.clone(),
@@ -126,7 +125,12 @@ impl MqttHandlerClientTask {
 
     async fn announce(&mut self) {
         for i in 0..32 {
-            let prefix = format!("{}/binary_sensor/{}/{}", self.prefix, self.options.client_id(), i);
+            let prefix = format!(
+                "{}/binary_sensor/{}/{}",
+                self.prefix,
+                self.options.client_id(),
+                i
+            );
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/pressed", prefix);
             let spec = BinarySensorSpec {
@@ -135,18 +139,19 @@ impl MqttHandlerClientTask {
                 icon: "mdi:light-switch-off".to_string(),
                 state_topic: state_topic.clone(),
             };
-            self.client.publish(
-                discovery_topic,
-                QoS::AtLeastOnce,
-                true,
-                serde_json::to_string(&spec).unwrap(),
-            ).await.unwrap();
-            self.client.publish(
-                state_topic,
-                QoS::AtLeastOnce,
-                true,
-                "OFF"
-            ).await.unwrap();
+            self.client
+                .publish(
+                    discovery_topic,
+                    QoS::AtLeastOnce,
+                    true,
+                    serde_json::to_string(&spec).unwrap(),
+                )
+                .await
+                .unwrap();
+            self.client
+                .publish(state_topic, QoS::AtLeastOnce, true, "OFF")
+                .await
+                .unwrap();
         }
         // Announce lights
         for i in 0..32 {
@@ -160,24 +165,32 @@ impl MqttHandlerClientTask {
                 state_topic: state_topic.clone(),
                 command_topic: command_topic.clone(),
             };
-            self.client.publish(
-                discovery_topic,
-                QoS::AtLeastOnce,
-                true,
-                serde_json::to_string(&spec).unwrap(),
-            ).await.unwrap();
-            self.client.publish(
-                state_topic,
-                QoS::AtLeastOnce,
-                true,
-                "OFF"
-            ).await.unwrap();
+            self.client
+                .publish(
+                    discovery_topic,
+                    QoS::AtLeastOnce,
+                    true,
+                    serde_json::to_string(&spec).unwrap(),
+                )
+                .await
+                .unwrap();
+            self.client
+                .publish(state_topic, QoS::AtLeastOnce, true, "OFF")
+                .await
+                .unwrap();
         }
     }
 
     async fn subscribe(&mut self) {
-        let topic = format!("{}/light/{}/+/switch", self.prefix, self.options.client_id());
-        self.client.subscribe(topic, QoS::AtLeastOnce).await.unwrap();
+        let topic = format!(
+            "{}/light/{}/+/switch",
+            self.prefix,
+            self.options.client_id()
+        );
+        self.client
+            .subscribe(topic, QoS::AtLeastOnce)
+            .await
+            .unwrap();
     }
 }
 
@@ -248,7 +261,8 @@ impl Handler for MqttHandler {
     fn handle(&mut self, message: &Message) -> HandleResult {
         match message {
             Message::ReceivedFromController(message_body) => {
-                self.mqtt_sender.send(message_body.clone())
+                self.mqtt_sender
+                    .send(message_body.clone())
                     .unwrap_or_else(|_| unreachable!());
             }
             Message::Stop => {
