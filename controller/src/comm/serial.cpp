@@ -15,6 +15,7 @@
 
 #include "comm/serial.hpp"
 
+#include "hal/io.hpp"
 #include "util/slip.hpp"
 
 namespace StandaertHA::Comm::Serial {
@@ -24,12 +25,15 @@ namespace StandaertHA::Comm::Serial {
     byte buffer[Comm::MAX_MESSAGE_LENGTH];
     byte size = message.to_buffer(buffer, sizeof(buffer));
     if (size == 0) {
-      // TODO(Roel): failure?
       return;
     }
 
     byte encoded_buf[sizeof(buffer) * 2 + 2];
-    size_t encoded_size = Util::SLIP::encode(buffer, size, encoded_buf, sizeof(encoded_buf));
+    size_t encoded_size = 0;
+    bool success = Util::SLIP::encode(buffer, size, encoded_buf, sizeof(encoded_buf), encoded_size);
+    if (!success) {
+      return;
+    }
 
     ::Serial.write(encoded_buf, encoded_size);
   }
@@ -39,7 +43,8 @@ namespace StandaertHA::Comm::Serial {
     Comm::UpdateMsg update_msg;
     update_msg.outputs = Util::Inet::htonl(state.output.value());
     uint8_t event_count = 0;
-    for (uint8_t i = 0; i < 32; ++i) {
+    for (uint8_t i = 0; i < HAL::IO::NB_INPUTS; ++i) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
       Event& next_event = update_msg.events[event_count];
       const bool fedge = !state.input.current.get(i) && state.input.previous.get(i);
       const bool redge = state.input.current.get(i) && !state.input.previous.get(i);
@@ -77,9 +82,10 @@ namespace StandaertHA::Comm::Serial {
 
   void send_error(const char * const error_message, const size_t size) noexcept
   {
-    Comm::FailMsg fail_msg;
+    Comm::FailMsg fail_msg{};
     size_t i = 0;
     for (; i < size && i < sizeof(fail_msg.message); ++i) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
       fail_msg.message[i] = pgm_read_byte_near(error_message + i);
     }
 
@@ -89,9 +95,10 @@ namespace StandaertHA::Comm::Serial {
 
   void send_info(const char * const info_message, const size_t size) noexcept
   {
-    Comm::InfoMsg info_msg;
+    Comm::InfoMsg info_msg{};
     size_t i = 0;
     for (; i < size && i < sizeof(info_msg.message); ++i) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
       info_msg.message[i] = pgm_read_byte_near(info_message + i);
     }
 

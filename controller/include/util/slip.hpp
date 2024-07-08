@@ -21,14 +21,16 @@ namespace StandaertHA::Util::SLIP {
 
   constexpr const uint8_t END = 0xC0;
 
-  [[nodiscard]] size_t encode(const uint8_t * const in_buf,
-                                   const size_t in_size,
-                                   uint8_t * const out_buf,
-                                   const size_t out_size) noexcept;
+  [[nodiscard]] bool encode(const uint8_t* in_buf,
+                            size_t in_size,
+                            uint8_t* out_buf,
+                            size_t out_buf_size,
+                            size_t& out_size) noexcept;
 
-  [[nodiscard]] size_t decode(const uint8_t * const in_buf,
-                                   const size_t in_size,
-                                   uint8_t * const out_buf,
-                                   const size_t out_size) noexcept;
+  [[nodiscard]] bool decode(const uint8_t* in_buf,
+                            size_t in_size,
+                            uint8_t* out_buf,
+                            size_t out_buf_size,
+                            size_t& out_size) noexcept;
 
 } // StandaertHA::Util

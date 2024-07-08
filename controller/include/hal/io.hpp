@@ -19,6 +19,9 @@
 
 namespace StandaertHA::HAL::IO {
 
+  constexpr const uint8_t NB_INPUTS = UINT8_C(32);
+  constexpr const uint8_t NB_OUTPUTS = UINT8_C(32);
+
   /**
    * Reset all IO expanders (e.g. on bootup)
    */

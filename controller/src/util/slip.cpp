@@ -25,57 +25,91 @@ namespace StandaertHA::Util::SLIP {
 
   }
 
-  // TODO(Roel): out_size?
-  size_t encode(const uint8_t * const in_buf,
-                const size_t in_size,
-                uint8_t * const out_buf,
-                const size_t out_size) noexcept
+  bool encode(const uint8_t * const in_buf,
+              const size_t in_size,
+              uint8_t * const out_buf,
+              const size_t out_buf_size,
+              size_t& out_size) noexcept
   {
     size_t pos = 0;
+    if (pos >= out_buf_size) {
+      return false;
+    }
     out_buf[pos++] = END;
 
     for (size_t in_pos = 0; in_pos < in_size; ++in_pos) {
       const uint8_t b = in_buf[in_pos];
       if (b == END) {
+        if (pos >= out_buf_size) {
+          return false;
+        }
         out_buf[pos++] = ESC;
+        if (pos >= out_buf_size) {
+          return false;
+        }
         out_buf[pos++] = ESC_END;
       } else if (b == ESC) {
+        if (pos >= out_buf_size) {
+          return false;
+        }
         out_buf[pos++] = ESC;
+        if (pos >= out_buf_size) {
+          return false;
+        }
         out_buf[pos++] = ESC_ESC;
       } else {
+        if (pos >= out_buf_size) {
+          return false;
+        }
         out_buf[pos++] = b;
       }
     }
 
+    if (pos >= out_buf_size) {
+      return false;
+    }
     out_buf[pos++] = END;
-    return pos;
+
+    out_size = pos;
+    return true;
   }
 
-  // TODO(Roel): out_size?
-  size_t decode(const uint8_t * const in_buf,
-                const size_t in_size,
-                uint8_t * const out_buf,
-                const size_t out_size) noexcept
+  bool decode(const uint8_t * const in_buf,
+              const size_t in_size,
+              uint8_t * const out_buf,
+              const size_t out_buf_size,
+              size_t& out_size) noexcept
   {
     size_t in_pos = 1;
     size_t pos = 0;
     while (in_pos < in_size &&
            in_buf[in_pos] != END) {
       if (in_buf[in_pos] == ESC) {
-          ++in_pos;
-          if (in_buf[in_pos] == ESC_END) {
-              out_buf[pos++] = END;
-          } else if (in_buf[in_pos] == ESC_ESC) {
-              out_buf[pos++] = ESC;
-          } else {
-              // TODO(Roel): error?
+        ++in_pos;
+        if (in_buf[in_pos] == ESC_END) {
+          if (pos >= out_buf_size) {
+            return false;
           }
+          out_buf[pos++] = END;
+        } else if (in_buf[in_pos] == ESC_ESC) {
+          if (pos >= out_buf_size) {
+            return false;
+          }
+          out_buf[pos++] = ESC;
+        } else {
+          // Invalid escape
+          return false;
+        }
       } else {
-          out_buf[pos++] = in_buf[in_pos];
+        if (pos >= out_buf_size) {
+          return false;
+        }
+        out_buf[pos++] = in_buf[in_pos];
       }
       ++in_pos;
     }
-    return pos;
+    out_size = pos;
+    return true;
   }
 
 }

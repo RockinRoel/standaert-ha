@@ -33,27 +33,27 @@
 namespace StandaertHA {
   State state;
 
-  void debounce(State& state) noexcept;
+  [[nodiscard]] bool recv_message(State& state) noexcept;
+  void handle_message(State& state) noexcept;
   void handle_command_message(State& state) noexcept;
   void handle_program_message(State& state) noexcept;
   void receive_program_data(State& state) noexcept;
   void abort_upload(State& state) noexcept;
   void finalize_program_upload(State& state) noexcept;
-  [[nodiscard]] bool recv_message(State& state) noexcept;
-  void handle_message(State& state) noexcept;
   void update_inputs(State& state) noexcept;
   bool run_program(State& state) noexcept;
   void update_outputs(const State& state, const Collections::BitSet32& output_before) noexcept;
   void send_update(State& state, const Collections::BitSet32& output_before) noexcept;
 
-  void debounce(State& state) noexcept
+  // Update inputs
+  void update_inputs(State& state) noexcept
   {
     state.input.previous = state.input.current;
 
     const Collections::BitSet32 inputs = HAL::IO::read_inputs();
     const unsigned long now = millis();
 
-    for (byte i = 0; i < 32; ++i) {
+    for (byte i = 0; i < HAL::IO::NB_INPUTS; ++i) {
       const bool read_value = inputs.get(i);
       const bool last_read_value = state.input.last_read.get(i);
       const bool current_committed_value = state.input.current.get(i);
@@ -93,9 +93,8 @@ namespace StandaertHA {
           s = RxState::READ;
         }
       } else {
-        // TODO(Roel): buffer issue?
         if (state.serial.input_pos == sizeof(state.serial.input_buffer) - 1) {
-          // Buffer full, should not happen, reset
+          // Buffer full, should not happen, discard buffer
           s = RxState::SCAN;
           state.serial.input_pos = 0;
           continue;
@@ -104,14 +103,18 @@ namespace StandaertHA {
         if (b == Util::SLIP::END) {
           if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
             byte decoded_buf[Comm::MAX_MESSAGE_LENGTH];
-            size_t decoded_size = Util::SLIP::decode(state.serial.input_buffer,
-                                                     state.serial.input_pos,
-                                                     decoded_buf,
-                                                     sizeof(decoded_buf));
-            state.message = Comm::Message::from_buffer(decoded_buf, decoded_size);
+            size_t decoded_size = 0;
+            bool success = Util::SLIP::decode(state.serial.input_buffer,
+                                              state.serial.input_pos,
+                                              decoded_buf,
+                                              sizeof(decoded_buf),
+                                              decoded_size);
+            if (success) {
+              state.message = Comm::Message::from_buffer(decoded_buf, decoded_size);
+            }
             s = RxState::SCAN;
             state.serial.input_pos = 0;
-            return true;
+            return success;
           } else {
             // discard!
           }
@@ -231,11 +234,6 @@ namespace StandaertHA {
         // Do nothing
       }
     }
-  }
-
-  // Update inputs
-  void update_inputs(State& state) noexcept {
-    debounce(state);
   }
 
   // Run program

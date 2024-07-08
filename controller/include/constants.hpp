@@ -15,7 +15,13 @@
 
 #pragma once
 
+// We don't actually have cstdint and cstring headers
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
+
 namespace StandaertHA::Constants {
+
+    constexpr const uint8_t BYTE_SIZE = UINT8_C(8);
+    constexpr const uint8_t BYTE_MASK = UINT8_C(0xFF);
 
     constexpr const int MODE_PIN = 10;
     constexpr const int MSB_PIN = 11;

@@ -19,6 +19,7 @@
 
 #include "comm/message.hpp"
 #include "constants.hpp"
+#include "hal/io.hpp"
 #include "shal/interpreter.hpp"
 
 namespace StandaertHA {
@@ -36,9 +37,11 @@ namespace StandaertHA {
      * Serial state (input buffer)
      */
     struct Serial {
-      uint8_t input_pos = 0;
+      size_t input_pos = 0;
       uint8_t input_buffer[Comm::MAX_MESSAGE_LENGTH * 2 + 2]; // message is max 128 bytes, times 2 to account for escapes, SLIP_END twice is 2 bytes
     } serial;
+
+    static_assert(sizeof(Serial::input_buffer) <= SIZE_MAX);
 
     /**
      * Debounced inputs
@@ -53,7 +56,7 @@ namespace StandaertHA {
        * so 0 means the button is pressed, 1 means the
        * button is not pressed.
        */
-      Collections::BitSet32 current{0xFFFFFFFF};
+      Collections::BitSet32 current{UINT32_MAX};
 
       /**
        * Previous committed state (after debouncing)
@@ -64,19 +67,19 @@ namespace StandaertHA {
        * so 0 means the button is pressed, 1 means the
        * button is not pressed.
        */
-      Collections::BitSet32 previous{0xFFFFFFFF};
+      Collections::BitSet32 previous{UINT32_MAX};
 
       /**
        * Last measured state
        *
        * Array of 32 bits, 1 for HIGH, 0 for LOW
        */
-      Collections::BitSet32 last_read{0xFFFFFFFF};
+      Collections::BitSet32 last_read{UINT32_MAX};
 
       /**
        * Timestamp when the last_read state was first measured
        */
-      unsigned long timestamps[32];
+      unsigned long timestamps[HAL::IO::NB_INPUTS];
     } input;
 
     /**

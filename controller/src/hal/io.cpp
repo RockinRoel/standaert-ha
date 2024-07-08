@@ -21,6 +21,8 @@
 
 namespace StandaertHA::HAL::IO {
 
+  constexpr const long RESET_DELAY = 50L;
+
   /**
    * Reset all IO expanders (e.g. on bootup)
    */
@@ -31,14 +33,14 @@ namespace StandaertHA::HAL::IO {
     digitalWrite(Constants::RST_OUT1_PIN, LOW);
     digitalWrite(Constants::RST_OUT2_PIN, LOW);
 
-    delay(50);
+    delay(RESET_DELAY);
 
     digitalWrite(Constants::RST_IN1_PIN, HIGH);
     digitalWrite(Constants::RST_IN2_PIN, HIGH);
     digitalWrite(Constants::RST_OUT1_PIN, HIGH);
     digitalWrite(Constants::RST_OUT2_PIN, HIGH);
 
-    delay(50);
+    delay(RESET_DELAY);
   }
 
   void configure_inputs() noexcept
@@ -86,9 +88,9 @@ namespace StandaertHA::HAL::IO {
       Wire.write(Constants::MCP23017_GPIOA);
       Wire.endTransmission();
       Wire.requestFrom(inAddr, 2);
-      result = result | (((uint32_t)Wire.read()) << (i * 8));
+      result = result | (((uint32_t)Wire.read()) << (static_cast<uint32_t>(i) * Constants::BYTE_SIZE));
       ++i;
-      result = result | (((uint32_t)Wire.read()) << (i * 8));
+      result = result | (((uint32_t)Wire.read()) << (static_cast<uint32_t>(i) * Constants::BYTE_SIZE));
       ++i;
     }
     return Collections::BitSet32(result);
@@ -101,9 +103,9 @@ namespace StandaertHA::HAL::IO {
     for (auto outAddr = Constants::OUT1_ADDR; outAddr <= Constants::OUT2_ADDR; ++outAddr) {
       Wire.beginTransmission(outAddr);
       Wire.write(Constants::MCP23017_GPIOA);
-      Wire.write((value >> (i * 8)) & 0xFF);
+      Wire.write((value >> (static_cast<uint32_t>(i) * Constants::BYTE_SIZE)) & Constants::BYTE_MASK);
       ++i;
-      Wire.write((value >> (i * 8)) & 0xFF);
+      Wire.write((value >> (static_cast<uint32_t>(i) * Constants::BYTE_SIZE)) & Constants::BYTE_MASK);
       ++i;
       Wire.endTransmission();
     }
