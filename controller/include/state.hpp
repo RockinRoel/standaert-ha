@@ -18,6 +18,7 @@
 #include <Arduino.h>
 
 #include "comm/message.hpp"
+#include "comm/serial.hpp"
 #include "constants.hpp"
 #include "hal/io.hpp"
 #include "shal/interpreter.hpp"
@@ -39,6 +40,7 @@ namespace StandaertHA {
     struct Serial {
       size_t input_pos = 0;
       uint8_t input_buffer[Comm::MAX_MESSAGE_LENGTH * 2 + 2]; // message is max 128 bytes, times 2 to account for escapes, SLIP_END twice is 2 bytes
+      Comm::Serial::RxState rx_state = Comm::Serial::RxState::SCAN;
     } serial;
 
     static_assert(sizeof(Serial::input_buffer) <= SIZE_MAX);

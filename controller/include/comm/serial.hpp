@@ -17,31 +17,40 @@
 
 #include <Arduino.h>
 
-#include "state.hpp"
-
 #include "collections/bitset32.hpp"
 #include "comm/message.hpp"
 #include "shal/interpreter.hpp"
 
-namespace StandaertHA::Comm::Serial {
+namespace StandaertHA {
+  struct State;
 
-  extern void send(const Message& message) noexcept;
-  extern void send_update(const State& state) noexcept;
-  extern void send_program_start_ack(const Shal::Interpreter::ProgramHeader& header) noexcept;
-  extern void send_program_end_ack(const Shal::Interpreter::ProgramHeader& header) noexcept;
+  namespace Comm::Serial {
+    enum class RxState {
+      SCAN, // Looking for first SLIP_END
+      READ, // Reading message
+    };
 
-  extern void send_error(const char* message, size_t size) noexcept;
-  extern void send_info(const char* message, size_t size) noexcept;
+    [[nodiscard]] extern bool receive(State& state) noexcept;
 
-  template<size_t size>
-  inline void send_error(const char (&message)[size]) noexcept
-  {
-    send_error(message, size - 1);
+    extern void send(const Message& message) noexcept;
+    extern void send_update(const State& state) noexcept;
+    extern void send_program_start_ack(const Shal::Interpreter::ProgramHeader& header) noexcept;
+    extern void send_program_end_ack(const Shal::Interpreter::ProgramHeader& header) noexcept;
+
+    extern void send_error(const char* message, size_t size) noexcept;
+    extern void send_info(const char* message, size_t size) noexcept;
+
+    template<size_t size>
+    inline void send_error(const char (&message)[size]) noexcept
+    {
+      send_error(message, size - 1);
+    }
+
+    template<size_t size>
+    inline void send_info(const char (&message)[size]) noexcept
+    {
+      send_info(message, size - 1);
+    }
   }
 
-  template<size_t size>
-  inline void send_info(const char (&message)[size]) noexcept
-  {
-    send_info(message, size - 1);
-  }
 }

@@ -15,10 +15,58 @@
 
 #include "comm/serial.hpp"
 
+#include "state.hpp"
 #include "hal/io.hpp"
 #include "util/slip.hpp"
 
 namespace StandaertHA::Comm::Serial {
+
+  bool receive(State& state) noexcept
+  {
+    // Reset message
+    state.message = Comm::Message();
+    while (::Serial.available() > 0) {
+      int b = ::Serial.read();
+      if (state.serial.rx_state == RxState::SCAN) {
+        if (b == Util::SLIP::END) {
+          state.serial.input_buffer[0] = Util::SLIP::END;
+          state.serial.input_pos = 1;
+          state.serial.rx_state = RxState::READ;
+        }
+      } else {
+        if (state.serial.input_pos == sizeof(state.serial.input_buffer) - 1) {
+          // Buffer full, should not happen, discard buffer
+          state.serial.rx_state = RxState::SCAN;
+          state.serial.input_pos = 0;
+          continue;
+        }
+        state.serial.input_buffer[state.serial.input_pos++] = b;
+        if (b == Util::SLIP::END) {
+          if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
+            byte decoded_buf[Comm::MAX_MESSAGE_LENGTH];
+            size_t decoded_size = 0;
+            bool success = Util::SLIP::decode(state.serial.input_buffer,
+                                              state.serial.input_pos,
+                                              decoded_buf,
+                                              sizeof(decoded_buf),
+                                              decoded_size);
+            if (success) {
+              state.message = Comm::Message::from_buffer(decoded_buf, decoded_size);
+            }
+            state.serial.rx_state = RxState::SCAN;
+            state.serial.input_pos = 0;
+            return success;
+          } else {
+            // discard!
+          }
+          state.serial.rx_state = RxState::SCAN;
+          state.serial.input_pos = 0;
+          return false;
+        }
+      }
+    }
+    return false;
+  }
 
   void send(const Message& message) noexcept
   {

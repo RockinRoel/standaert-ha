@@ -76,55 +76,7 @@ namespace StandaertHA {
   // Receive message
   bool recv_message(State& state) noexcept
   {
-    // Reset message
-    state.message = Comm::Message();
-    enum class RxState {
-      SCAN, // Looking for first SLIP_END
-      READ  // Reading message
-    };
-    static RxState s = RxState::SCAN;
-
-    while (Serial.available() > 0) {
-      int b = Serial.read();
-      if (s == RxState::SCAN) {
-        if (b == Util::SLIP::END) {
-          state.serial.input_buffer[0] = Util::SLIP::END;
-          state.serial.input_pos = 1;
-          s = RxState::READ;
-        }
-      } else {
-        if (state.serial.input_pos == sizeof(state.serial.input_buffer) - 1) {
-          // Buffer full, should not happen, discard buffer
-          s = RxState::SCAN;
-          state.serial.input_pos = 0;
-          continue;
-        }
-        state.serial.input_buffer[state.serial.input_pos++] = b;
-        if (b == Util::SLIP::END) {
-          if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
-            byte decoded_buf[Comm::MAX_MESSAGE_LENGTH];
-            size_t decoded_size = 0;
-            bool success = Util::SLIP::decode(state.serial.input_buffer,
-                                              state.serial.input_pos,
-                                              decoded_buf,
-                                              sizeof(decoded_buf),
-                                              decoded_size);
-            if (success) {
-              state.message = Comm::Message::from_buffer(decoded_buf, decoded_size);
-            }
-            s = RxState::SCAN;
-            state.serial.input_pos = 0;
-            return success;
-          } else {
-            // discard!
-          }
-          s = RxState::SCAN;
-          state.serial.input_pos = 0;
-          return false;
-        }
-      }
-    }
-    return false;
+    return Comm::Serial::receive(state);
   }
 
   void handle_command_message(State& state) noexcept {
