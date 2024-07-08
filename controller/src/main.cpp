@@ -34,14 +34,12 @@ namespace StandaertHA {
   State state;
 
   void debounce(State& state) noexcept;
-  bool receive(State& state) noexcept;
   void handle_command_message(State& state) noexcept;
   void handle_program_message(State& state) noexcept;
   void receive_program_data(State& state) noexcept;
   void abort_upload(State& state) noexcept;
   void finalize_program_upload(State& state) noexcept;
-  void handle(State& state) noexcept;
-  void recv_message(State& state) noexcept;
+  [[nodiscard]] bool recv_message(State& state) noexcept;
   void handle_message(State& state) noexcept;
   void update_inputs(State& state) noexcept;
   bool run_program(State& state) noexcept;
@@ -75,7 +73,8 @@ namespace StandaertHA {
     state.input.last_read = inputs;
   }
 
-  bool receive(State& state) noexcept
+  // Receive message
+  bool recv_message(State& state) noexcept
   {
     // Reset message
     state.message = Comm::Message();
@@ -217,7 +216,8 @@ namespace StandaertHA {
     Comm::Serial::send_program_end_ack(state.program.header());
   }
 
-  void handle(State& state) noexcept {
+  // Handle messages
+  void handle_message(State& state) noexcept {
     switch (state.message.type()) {
       case Comm::MessageType::Command:
         handle_command_message(state);
@@ -231,16 +231,6 @@ namespace StandaertHA {
         // Do nothing
       }
     }
-  }
-
-  // Receive messages
-  void recv_message(State& state) noexcept {
-    receive(state);
-  }
-
-  // Handle messages
-  void handle_message(State& state) noexcept {
-    handle(state);
   }
 
   // Update inputs
@@ -261,9 +251,9 @@ namespace StandaertHA {
     const Collections::BitSet32 input_old(state.input.previous);
     const Collections::BitSet32 input_new(state.input.current);
     const Collections::BitSet32 output_old(state.output);
-    Shal::Interpreter::VmState vmState(input_old, input_new, output_old);
-    bool success = state.program.cycle(vmState);
-    state.output = vmState.new_output();
+    Shal::Interpreter::VmContext vmContext(input_old, input_new, output_old);
+    bool success = vmContext.run(state.program);
+    state.output = vmContext.new_output();
     return success;
   }
 
@@ -339,8 +329,9 @@ void loop() {
 
   const Collections::BitSet32 output_before = state.output;
 
-  recv_message(state);
-  handle_message(state);
+  if (recv_message(state)) {
+    handle_message(state);
+  }
   update_inputs(state);
   bool success = run_program(state);
   digitalWrite(LED_BUILTIN, success ? LOW : HIGH);
