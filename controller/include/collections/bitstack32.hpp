@@ -29,6 +29,7 @@ namespace StandaertHA::Collections {
       : stack_(UINT32_C(0)),
         stackDepth_(UINT32_C(0)) {}
 
+   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     constexpr explicit BitStack32(uint32_t value, uint8_t stackDepth) noexcept
       : stack_(value),
         stackDepth_(stackDepth) {}
@@ -37,9 +38,11 @@ namespace StandaertHA::Collections {
 
     constexpr BitStack32 &operator=(const BitStack32 &other) noexcept = default;
 
-    BitStack32(BitStack32 &&) = delete;
+    constexpr BitStack32(BitStack32 &&) noexcept = default;
 
-    BitStack32 &operator=(BitStack32 &&) = delete;
+    constexpr BitStack32 &operator=(BitStack32 &&) noexcept = default;
+
+    ~BitStack32() = default;
 
     constexpr void push(bool value) noexcept {
       if (value) {
@@ -69,10 +72,12 @@ namespace StandaertHA::Collections {
     }
   };
 
+  // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
   static_assert(BitStack32().all_one());
   static_assert(BitStack32(UINT32_C(0xFFFF'FFFF), 32).all_one());
   static_assert(BitStack32(UINT32_C(0x0000'0003), 2).all_one());
   static_assert(BitStack32(UINT32_C(0x0000'0003), 1).all_one());
   static_assert(!BitStack32(UINT32_C(0x0000'0003), 3).all_one());
+  // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
 }

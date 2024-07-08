@@ -1,0 +1,13 @@
+Checks: >-
+  bugprone-*,
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic
+HeaderFileExtensions:
+  - hpp
+ImplementationFileExtensions:
+  - cpp

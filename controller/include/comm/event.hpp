@@ -18,14 +18,14 @@
 #include <Arduino.h>
 
 namespace StandaertHA::Comm {
-  constexpr uint8_t EVENT_TYPE_MASK = 0xE0;
-  constexpr uint8_t INPUT_MASK = 0x1F;
+  constexpr uint8_t EVENT_TYPE_MASK = 0xE0U;
+  constexpr uint8_t INPUT_MASK = 0x1FU;
 
   /**
    * Event, encoded as:
    *
    * TTTIIIII
-   * 
+   *
    * TTT: event type
    * IIIII: input id
    *
@@ -47,7 +47,7 @@ namespace StandaertHA::Comm {
 
     constexpr explicit Event(Type type, uint8_t input) noexcept
       : data_(static_cast<uint8_t>(type) | // type
-              (input & 0x1F)) // input id
+              (input & INPUT_MASK)) // input id
     { }
 
     [[nodiscard]] constexpr Type type() const noexcept {

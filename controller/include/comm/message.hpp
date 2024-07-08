@@ -124,7 +124,7 @@ namespace StandaertHA::Comm {
     ProgramData program_data;
     ProgramEnd program_end;
     ProgramEndAck program_end_ack;
-    uint8_t raw[MAX_MESSAGE_BODY_LENGTH];
+    uint8_t raw[MAX_MESSAGE_BODY_LENGTH] = {0};
   } __attribute__((packed));
 
   static_assert(sizeof(MsgBody) == MAX_MESSAGE_BODY_LENGTH);
@@ -165,7 +165,7 @@ namespace StandaertHA::Comm {
 
   private:
     MsgBody body_;
-    MessageType type_;
+    MessageType type_ = MessageType::Uninit;
     uint16_t crc_ = 0;
     uint8_t body_length_ = 0;
 

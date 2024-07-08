@@ -24,10 +24,7 @@ namespace StandaertHA::Comm {
 Message::Message() noexcept
   : body_{
       .raw = {0},
-    },
-    type_(MessageType::Uninit),
-    crc_(0),
-    body_length_(0)
+    }
 {}
 
 uint16_t Message::calc_crc() const noexcept
@@ -50,93 +47,93 @@ Message::Message(const UpdateMsg& update, uint8_t event_count) noexcept
   : body_{
       .update = update,
     },
-    type_(MessageType::Update)
+    type_(MessageType::Update),
+    body_length_(event_count + sizeof(update.outputs))
 {
-  body_length_ = event_count + sizeof(update.outputs);
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const CommandMsg& command, uint8_t command_count) noexcept
   : body_{
       .command = command,
     },
-    type_(MessageType::Command)
+    type_(MessageType::Command),
+    body_length_(command_count)
 {
-  body_length_ = command_count;
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const FailMsg& fail_msg, uint8_t size) noexcept
   : body_{
       .fail_msg = fail_msg,
     },
-    type_(MessageType::Fail)
+    type_(MessageType::Fail),
+    body_length_(size)
 {
-  body_length_ = size;
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const InfoMsg& info_msg, uint8_t size) noexcept
   : body_{
     .info_msg = info_msg,
   },
-  type_(MessageType::Info)
+  type_(MessageType::Info),
+  body_length_(size)
 {
-  body_length_ = size;
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const ProgramStart& program_start) noexcept
   : body_{
       .program_start = program_start,
     },
-    type_(MessageType::ProgramStart)
+    type_(MessageType::ProgramStart),
+    body_length_(sizeof(ProgramStart))
 {
-  body_length_ = sizeof(ProgramStart);
-  static_assert(sizeof(ProgramStart) == 8);
-  crc_ = calc_crc();
+  static_assert(sizeof(ProgramStart) == Shal::Interpreter::PROGRAM_HEADER_SIZE);
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const ProgramStartAck& program_start_ack) noexcept
   : body_{
       .program_start_ack = program_start_ack,
     },
-    type_(MessageType::ProgramStartAck)
+    type_(MessageType::ProgramStartAck),
+    body_length_(sizeof(ProgramStartAck))
 {
-  body_length_ = sizeof(ProgramStartAck);
-  static_assert(sizeof(ProgramStartAck) == 8);
-  crc_ = calc_crc();
+  static_assert(sizeof(ProgramStartAck) == Shal::Interpreter::PROGRAM_HEADER_SIZE);
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const ProgramData& program_data, uint8_t byte_count) noexcept
   : body_{
       .program_data = program_data,
     },
-    type_(MessageType::ProgramData)
+    type_(MessageType::ProgramData),
+    body_length_(byte_count)
 {
-  body_length_ = byte_count;
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const ProgramEnd& program_end, uint8_t byte_count) noexcept
   : body_{
       .program_end = program_end,
     },
-    type_(MessageType::ProgramEnd)
+    type_(MessageType::ProgramEnd),
+    body_length_(byte_count)
 {
-  body_length_ = byte_count;
-  crc_ = calc_crc();
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message::Message(const ProgramEndAck& program_end_ack) noexcept
   : body_{
       .program_end_ack = program_end_ack,
     },
-    type_(MessageType::ProgramEndAck)
+    type_(MessageType::ProgramEndAck),
+    body_length_(sizeof(ProgramEndAck))
 {
-  body_length_ = sizeof(ProgramEndAck);
-  static_assert(sizeof(ProgramEndAck) == 8);
-  crc_ = calc_crc();
+  static_assert(sizeof(ProgramEndAck) == Shal::Interpreter::PROGRAM_HEADER_SIZE);
+  crc_ = calc_crc(); // NOLINT(*-prefer-member-initializer)
 }
 
 Message Message::from_buffer(const uint8_t *buffer, uint8_t size) noexcept
@@ -161,7 +158,7 @@ Message Message::from_buffer(const uint8_t *buffer, uint8_t size) noexcept
   if (type == static_cast<uint8_t>(MessageType::ProgramStart) ||
       type == static_cast<uint8_t>(MessageType::ProgramStartAck) ||
       type == static_cast<uint8_t>(MessageType::ProgramEndAck)) {
-    if (size - MESSAGE_HEADER_LENGTH != 8) {
+    if (size - MESSAGE_HEADER_LENGTH != Shal::Interpreter::PROGRAM_HEADER_SIZE) {
       // Length is not exactly 8 bytes?
       return result;
     }
@@ -198,8 +195,10 @@ uint8_t Message::to_buffer(uint8_t *buffer, uint8_t size) const noexcept {
     return 0;
   }
 
+  // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
   buffer[0] = static_cast<uint8_t>((crc_ >> 8) & 0xFF);
   buffer[1] = static_cast<uint8_t>(crc_ & 0xFF);
+  // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
   buffer[2] = static_cast<uint8_t>(type_);
 
   memcpy(buffer + MESSAGE_HEADER_LENGTH, body_.raw, body_length_);

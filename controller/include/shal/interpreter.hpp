@@ -26,6 +26,8 @@
 
 namespace StandaertHA::Shal::Interpreter {
 
+  constexpr const uint8_t PROGRAM_HEADER_SIZE = 8U;
+
   class Program;
 
   class VmContext {

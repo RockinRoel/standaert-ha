@@ -38,6 +38,8 @@ namespace StandaertHA::Collections {
 
     constexpr BitSet32 &operator=(BitSet32 &&) noexcept = default;
 
+    ~BitSet32() = default;
+
     constexpr void set(uint8_t bit, bool value) noexcept {
       if (value) {
         set_ |= (UINT32_C(1) << bit);
