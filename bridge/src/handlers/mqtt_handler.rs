@@ -91,30 +91,28 @@ impl MqttHandlerClientTask {
         loop {
             select! {
                 message = self.mqtt_receiver.recv() => {
-                    if let Some(message) = message {
-                        if let MessageBody::Update { outputs, events } = message {
-                            for i in 0..32 {
-                                let state_topic = format!("{}/light/{}/{}/status", self.prefix, self.options.client_id(), i);
-                                self.client.publish(
-                                    state_topic,
-                                    QoS::AtLeastOnce,
-                                    true,
-                                    if (outputs & (1 << i)) == 0 { "OFF" } else { "ON" },
-                                ).await.unwrap();
-                            }
-                            for event in &events {
-                                let (i, state) = match event {
-                                    Event::RisingEdge(i) => (i, "OFF"),
-                                    Event::FallingEdge(i) => (i, "ON"),
-                                };
-                                let state_topic = format!("{}/binary_sensor/{}/{}/pressed", self.prefix, self.options.client_id(), i);
-                                self.client.publish(
-                                    state_topic,
-                                    QoS::AtLeastOnce,
-                                    true,
-                                    state
-                                ).await.unwrap();
-                            }
+                    if let Some(MessageBody::Update { outputs, events}) = message {
+                        for i in 0..32 {
+                            let state_topic = format!("{}/light/{}/{}/status", self.prefix, self.options.client_id(), i);
+                            self.client.publish(
+                                state_topic,
+                                QoS::AtLeastOnce,
+                                true,
+                                if (outputs & (1 << i)) == 0 { "OFF" } else { "ON" },
+                            ).await.unwrap();
+                        }
+                        for event in &events {
+                            let (i, state) = match event {
+                                Event::RisingEdge(i) => (i, "OFF"),
+                                Event::FallingEdge(i) => (i, "ON"),
+                            };
+                            let state_topic = format!("{}/binary_sensor/{}/{}/pressed", self.prefix, self.options.client_id(), i);
+                            self.client.publish(
+                                state_topic,
+                                QoS::AtLeastOnce,
+                                true,
+                                state
+                            ).await.unwrap();
                         }
                     }
                 },
@@ -215,35 +213,33 @@ impl MqttHandlerEventLoopTask {
         loop {
             select! {
                 notification = self.event_loop.poll() => {
-                    if let Ok(rumqttc::Event::Incoming(incoming)) = notification {
-                        if let Incoming::Publish(publish) = incoming {
-                            let prefix = format!("{}/light/{}/", self.prefix, self.options.client_id());
-                            if let Some(suffix) = publish.topic.strip_prefix(&prefix) {
-                                if let Some(id) = suffix.strip_suffix("/switch") {
-                                    if let Ok(id) = id.parse::<u8>() {
-                                        if id < 32 {
-                                            if let Ok(payload) = String::from_utf8(publish.payload.to_vec()) {
-                                                match &payload[..] {
-                                                    "ON" => {
-                                                        self.sender.send(Message::SendToController(
-                                                            MessageBody::Command {
-                                                                commands: vec![
-                                                                    Command::On(id),
-                                                                ]
-                                                            }
-                                                        )).unwrap();
-                                                    },
-                                                    "OFF" => {
-                                                        self.sender.send(Message::SendToController(
-                                                            MessageBody::Command {
-                                                                commands: vec![
-                                                                    Command::Off(id),
-                                                                ]
-                                                            }
-                                                        )).unwrap();
-                                                    },
-                                                _ => {}}
-                                            }
+                    if let Ok(rumqttc::Event::Incoming(Incoming::Publish(publish))) = notification {
+                        let prefix = format!("{}/light/{}/", self.prefix, self.options.client_id());
+                        if let Some(suffix) = publish.topic.strip_prefix(&prefix) {
+                            if let Some(id) = suffix.strip_suffix("/switch") {
+                                if let Ok(id) = id.parse::<u8>() {
+                                    if id < 32 {
+                                        if let Ok(payload) = String::from_utf8(publish.payload.to_vec()) {
+                                            match &payload[..] {
+                                                "ON" => {
+                                                    self.sender.send(Message::SendToController(
+                                                        MessageBody::Command {
+                                                            commands: vec![
+                                                                Command::On(id),
+                                                            ]
+                                                        }
+                                                    )).unwrap();
+                                                },
+                                                "OFF" => {
+                                                    self.sender.send(Message::SendToController(
+                                                        MessageBody::Command {
+                                                            commands: vec![
+                                                                Command::Off(id),
+                                                            ]
+                                                        }
+                                                    )).unwrap();
+                                                },
+                                            _ => {}}
                                         }
                                     }
                                 }
