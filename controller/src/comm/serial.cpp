@@ -23,6 +23,10 @@
 
 namespace StandaertHA::Comm::Serial {
 
+  namespace {
+    constexpr const size_t MIN_SLIP_ENCODED_MESSAGE_LENGTH = 2 /* SLIP_END times 2 */ + Comm::MIN_MESSAGE_LENGTH;
+  }
+
   bool receive(State& state) noexcept
   {
     // Reset message
@@ -42,9 +46,10 @@ namespace StandaertHA::Comm::Serial {
           state.serial.input_pos = 0;
           continue;
         }
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         state.serial.input_buffer[state.serial.input_pos++] = b;
         if (b == Util::SLIP::END) {
-          if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
+          if (state.serial.input_pos >= MIN_SLIP_ENCODED_MESSAGE_LENGTH) {
             uint8_t decoded_buf[Comm::MAX_MESSAGE_LENGTH];
             size_t decoded_size = 0;
             bool success = Util::SLIP::decode(state.serial.input_buffer,
