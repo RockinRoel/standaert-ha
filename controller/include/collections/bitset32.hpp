@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
 
 namespace StandaertHA::Collections {
 
