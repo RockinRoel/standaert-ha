@@ -18,6 +18,7 @@
 #include "constants.hpp"
 #include "state.hpp"
 
+#include <Arduino.h>
 #include <Wire.h>
 
 namespace StandaertHA::HAL::IO {
@@ -124,7 +125,7 @@ namespace StandaertHA::HAL::IO {
     state.input.last_read = inputs;
   }
 
-  void write_outputs(const Collections::BitSet32 state) noexcept
+  void write_outputs(const Collections::BitSet32& state) noexcept
   {
     const auto value = state.value();
     byte i = 0;

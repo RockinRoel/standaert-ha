@@ -16,6 +16,7 @@
 #include "state.hpp"
 
 #include "messages.hpp"
+
 #include "hal/mode.hpp"
 
 namespace StandaertHA {

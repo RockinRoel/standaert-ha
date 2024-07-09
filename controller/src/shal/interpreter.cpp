@@ -15,8 +15,9 @@
 
 #include "shal/interpreter.hpp"
 
-#include "comm/serial.hpp"
 #include "messages.hpp"
+
+#include "comm/serial.hpp"
 
 #include <avr/eeprom.h>
 #include <util/crc16.h>

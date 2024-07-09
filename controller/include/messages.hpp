@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include <avr/pgmspace.h>
 
 namespace StandaertHA::Messages {
   const char MAXIMUM_CODE_SIZE_ERROR[] PROGMEM = {"Maximum code size exceeded!"};

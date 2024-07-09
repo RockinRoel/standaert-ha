@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include <stdint.h>
 
 #include "collections/bitset32.hpp"
 
@@ -74,7 +74,7 @@ namespace StandaertHA::Comm {
       return !operator==(other);
     }
 
-    [[nodiscard]] constexpr Collections::BitSet32 apply(const Collections::BitSet32 before) const noexcept {
+    [[nodiscard]] constexpr Collections::BitSet32 apply(const Collections::BitSet32& before) const noexcept {
       if (type() == Type::Toggle) {
         auto result = before;
         result.set(output(), !before.get(output()));

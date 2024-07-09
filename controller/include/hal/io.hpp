@@ -17,6 +17,8 @@
 
 #include "collections/bitset32.hpp"
 
+#include <stdint.h>
+
 namespace StandaertHA {
   struct State;
 
@@ -39,7 +41,7 @@ namespace StandaertHA {
     // Debounce
     extern void update_inputs(State& state) noexcept;
 
-    extern void write_outputs(const Collections::BitSet32 state) noexcept;
+    extern void write_outputs(const Collections::BitSet32& state) noexcept;
 
   } // HAL::IO
 

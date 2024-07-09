@@ -21,7 +21,7 @@
 
 #include "shal/interpreter.hpp"
 
-#include <Arduino.h>
+#include <stdint.h>
 
 namespace StandaertHA::Comm {
 

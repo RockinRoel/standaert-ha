@@ -3,6 +3,7 @@ Checks: >-
   clang-diagnostic-*,
   clang-analyzer-*,
   cppcoreguidelines-*,
+  -modernize-deprecated-headers,
   -cppcoreguidelines-avoid-c-arrays,
   -cppcoreguidelines-pro-type-union-access,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,

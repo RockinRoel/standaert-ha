@@ -15,11 +15,8 @@
 
 #pragma once
 
-#include <Arduino.h>
-
 #include "comm/message.hpp"
 #include "comm/serial.hpp"
-#include "constants.hpp"
 #include "hal/io.hpp"
 #include "shal/interpreter.hpp"
 

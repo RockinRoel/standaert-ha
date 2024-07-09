@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include <stdint.h>
 
 namespace StandaertHA::Comm {
   constexpr uint8_t EVENT_TYPE_MASK = 0xE0U;

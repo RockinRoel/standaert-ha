@@ -15,13 +15,11 @@
 
 #pragma once
 
-#include "constants.hpp"
-
-#include <Arduino.h>
+#include <stdint.h>
 
 namespace StandaertHA {
 
-  enum class Mode : byte {
+  enum class Mode : uint8_t {
     PROGRAM_DISABLED = 0,
     PROGRAM_ENABLED = 1
   };

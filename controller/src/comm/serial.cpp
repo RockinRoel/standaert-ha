@@ -19,6 +19,8 @@
 #include "hal/io.hpp"
 #include "util/slip.hpp"
 
+#include <Arduino.h>
+
 namespace StandaertHA::Comm::Serial {
 
   bool receive(State& state) noexcept
@@ -43,7 +45,7 @@ namespace StandaertHA::Comm::Serial {
         state.serial.input_buffer[state.serial.input_pos++] = b;
         if (b == Util::SLIP::END) {
           if (state.serial.input_pos >= 5) { // SLIP_END (1) + DATA (MIN 1) + CRC (2) + SLIP_END (1)
-            byte decoded_buf[Comm::MAX_MESSAGE_LENGTH];
+            uint8_t decoded_buf[Comm::MAX_MESSAGE_LENGTH];
             size_t decoded_size = 0;
             bool success = Util::SLIP::decode(state.serial.input_buffer,
                                               state.serial.input_pos,
@@ -70,13 +72,13 @@ namespace StandaertHA::Comm::Serial {
 
   void send(const Message& message) noexcept
   {
-    byte buffer[Comm::MAX_MESSAGE_LENGTH];
-    byte size = message.to_buffer(buffer, sizeof(buffer));
+    uint8_t buffer[Comm::MAX_MESSAGE_LENGTH];
+    uint8_t size = message.to_buffer(buffer, sizeof(buffer));
     if (size == 0) {
       return;
     }
 
-    byte encoded_buf[sizeof(buffer) * 2 + 2];
+    uint8_t encoded_buf[sizeof(buffer) * 2 + 2];
     size_t encoded_size = 0;
     bool success = Util::SLIP::encode(buffer, size, encoded_buf, sizeof(encoded_buf), encoded_size);
     if (!success) {

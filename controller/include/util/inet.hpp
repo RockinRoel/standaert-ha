@@ -15,11 +15,8 @@
 
 #pragma once
 
-// We don't actually have cstdint and cstring headers
-// NOLINTBEGIN(modernize-deprecated-headers)
 #include <stdint.h>
 #include <string.h>
-// NOLINTEND(modernize-deprecated-headers)
 
 namespace StandaertHA::Util::Inet {
 

@@ -21,8 +21,7 @@
 #include "collections/bitset32.hpp"
 #include "util/inet.hpp"
 
-#include <Arduino.h>
-#include <EEPROM.h>
+#include <avr/eeprom.h>
 
 namespace StandaertHA::Shal::Interpreter {
 

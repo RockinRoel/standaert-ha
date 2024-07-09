@@ -15,8 +15,7 @@
 
 #pragma once
 
-// We don't actually have cstdint and cstring headers
-#include <stdint.h> // NOLINT(modernize-deprecated-headers)
+#include <stdint.h>
 
 namespace StandaertHA::Constants {
 

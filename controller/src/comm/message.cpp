@@ -15,8 +15,7 @@
 
 #include "comm/message.hpp"
 
-#include "util/inet.hpp"
-
+#include <string.h>
 #include <util/crc16.h>
 
 namespace StandaertHA::Comm {

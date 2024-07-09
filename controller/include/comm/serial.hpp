@@ -15,11 +15,10 @@
 
 #pragma once
 
-#include <Arduino.h>
-
-#include "collections/bitset32.hpp"
 #include "comm/message.hpp"
 #include "shal/interpreter.hpp"
+
+#include <stddef.h>
 
 namespace StandaertHA {
   struct State;
