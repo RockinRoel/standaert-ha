@@ -17,22 +17,30 @@
 
 #include "collections/bitset32.hpp"
 
-namespace StandaertHA::HAL::IO {
+namespace StandaertHA {
+  struct State;
 
-  constexpr const uint8_t NB_INPUTS = UINT8_C(32);
-  constexpr const uint8_t NB_OUTPUTS = UINT8_C(32);
+  namespace HAL::IO {
 
-  /**
-   * Reset all IO expanders (e.g. on bootup)
-   */
-  extern void toggle_resets() noexcept;
+    constexpr const uint8_t NB_INPUTS = UINT8_C(32);
+    constexpr const uint8_t NB_OUTPUTS = UINT8_C(32);
 
-  extern void configure_inputs() noexcept;
+    /**
+     * Reset all IO expanders (e.g. on bootup)
+     */
+    extern void toggle_resets() noexcept;
 
-  extern void configure_outputs() noexcept;
+    extern void configure_inputs() noexcept;
 
-  extern Collections::BitSet32 read_inputs() noexcept;
+    extern void configure_outputs() noexcept;
 
-  extern void write_outputs(const Collections::BitSet32 state) noexcept;
+    extern Collections::BitSet32 read_inputs() noexcept;
 
-} // StandaertHA::HAL::IO
+    // Debounce
+    extern void update_inputs(State& state) noexcept;
+
+    extern void write_outputs(const Collections::BitSet32 state) noexcept;
+
+  } // HAL::IO
+
+} // StandaertHA

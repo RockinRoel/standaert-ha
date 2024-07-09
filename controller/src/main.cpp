@@ -48,29 +48,7 @@ namespace StandaertHA {
   // Update inputs
   void update_inputs(State& state) noexcept
   {
-    state.input.previous = state.input.current;
-
-    const Collections::BitSet32 inputs = HAL::IO::read_inputs();
-    const unsigned long now = millis();
-
-    for (byte i = 0; i < HAL::IO::NB_INPUTS; ++i) {
-      const bool read_value = inputs.get(i);
-      const bool last_read_value = state.input.last_read.get(i);
-      const bool current_committed_value = state.input.current.get(i);
-      const bool changed = read_value != current_committed_value;
-      if (changed) {
-        const bool stable = read_value == last_read_value;
-        if (stable) {
-          if (now - state.input.timestamps[i] >= Constants::DEBOUNCE_TIME_MILLIS) {
-            state.input.current.set(i, read_value);
-          }
-        } else {
-          state.input.timestamps[i] = now;
-        }
-      }
-    }
-
-    state.input.last_read = inputs;
+    HAL::IO::update_inputs(state);
   }
 
   // Receive message
