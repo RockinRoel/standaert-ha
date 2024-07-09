@@ -234,7 +234,7 @@ namespace StandaertHA::Shal::Interpreter {
 
   void Program::save()
   {
-    eeprom_write_block(this, nullptr, sizeof(ProgramHeader) + header_.length());
+    eeprom_update_block(this, nullptr, sizeof(ProgramHeader) + header_.length());
   }
 
   bool Program::load()
