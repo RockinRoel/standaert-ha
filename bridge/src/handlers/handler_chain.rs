@@ -1,13 +1,14 @@
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
 
+#[derive(Default)]
 pub struct HandlerChain {
     chain: Vec<Box<dyn Handler>>,
 }
 
 impl HandlerChain {
     pub fn new() -> Self {
-        Self { chain: vec![] }
+        Self::default()
     }
 
     // TODO(Roel): can we put anything less than a 'static lifetime on this?
