@@ -56,6 +56,8 @@ namespace StandaertHA::Shal::Interpreter {
     VmContext(VmContext&&) = delete;
     VmContext& operator=(VmContext&&) = delete;
 
+    ~VmContext() = default;
+
     [[nodiscard]] const BitSet32& new_output() const noexcept
     {
       return new_output_;

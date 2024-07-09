@@ -22,12 +22,8 @@ namespace StandaertHA::Messages {
   const char UNEXPECTED_PROGRAM_END_ERROR[] PROGMEM = {"Unexpected program end message"};
   const char UNEXPECTED_PROGRAM_DATA_ERROR[] PROGMEM = {"Unexpected program data message"};
   const char CODE_SIZE_MISMATCH_ERROR[] PROGMEM = {"Code size does not match size declared in program header!"};
-  const char PROGRAM_DATA_RECEIVED[] PROGMEM = {"Program data received"};
   const char UNKNOWN_INSTRUCTION[] PROGMEM = {"Unknown instruction"};
   const char PREVIOUS_BYTE_ERROR[] PROGMEM = {"Previous byte is not first byte"};
   const char END_OF_PROGRAM[] PROGMEM = {"Reached end of program"};
   const char PROGRAM_VERIFICATION_ERROR[] PROGMEM = {"Program CRC check failed!"};
-
-  const char UPLOADING[] PROGMEM = {"Uploading..."};
-  const char PROGRAM_CYCLE[] PROGMEM = {"Starting program cycle..."};
 }

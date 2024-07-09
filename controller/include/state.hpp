@@ -97,6 +97,18 @@ namespace StandaertHA {
     Comm::Message message;
 
     Shal::Interpreter::Program program;
+
+    void handle_message() noexcept;
+    [[nodiscard]] bool run_program() noexcept;
+    void update_outputs(const Collections::BitSet32& output_before) const noexcept;
+    void send_update(const Collections::BitSet32& output_before) noexcept;
+
+  private:
+    void handle_command_message() noexcept;
+    void handle_program_message() noexcept;
+    void receive_program_data() noexcept;
+    void abort_upload() noexcept;
+    void finalize_program_upload() noexcept;
   };
 
 }
