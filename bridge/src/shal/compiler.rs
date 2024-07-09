@@ -1,3 +1,4 @@
+use crate::shal::ast::SourceLoc;
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
 use crate::shal::compiler::CompileError::{DuplicateEntityError, UnknownEntityError};
@@ -5,7 +6,6 @@ use crate::shal::compiler::InOut::{Input, Output};
 use crate::shal::{ast, bytecode};
 use std::collections::HashMap;
 use thiserror::Error;
-use crate::shal::ast::SourceLoc;
 
 enum InOut {
     Input(u8),
@@ -22,7 +22,12 @@ fn loc_to_string(source_loc: &Option<ast::SourceLoc>) -> String {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum CompileError {
-    #[error("Duplicate entity: {0} at {1}, first defined at {2}", name, loc_to_string(second_loc), loc_to_string(first_loc))]
+    #[error(
+        "Duplicate entity: {0} at {1}, first defined at {2}",
+        name,
+        loc_to_string(second_loc),
+        loc_to_string(first_loc)
+    )]
     DuplicateEntityError {
         name: String,
         first_loc: Option<ast::SourceLoc>,
@@ -37,10 +42,7 @@ pub enum CompileError {
 
 type Entities = HashMap<String, (InOut, Option<SourceLoc>)>;
 
-fn retrieve_input(
-    entities: &Entities,
-    input: &ast::Input,
-) -> Result<u8, CompileError> {
+fn retrieve_input(entities: &Entities, input: &ast::Input) -> Result<u8, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
@@ -56,10 +58,7 @@ fn retrieve_input(
     }
 }
 
-fn retrieve_output(
-    entities: &Entities,
-    output: &ast::Output,
-) -> Result<u8, CompileError> {
+fn retrieve_output(entities: &Entities, output: &ast::Output) -> Result<u8, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
@@ -89,13 +88,15 @@ fn retrieve_entity(
     }
 }
 
-fn collect_entities(
-    declarations: &[ast::Declaration],
-) -> Result<Entities, CompileError> {
+fn collect_entities(declarations: &[ast::Declaration]) -> Result<Entities, CompileError> {
     let mut result = HashMap::new();
     for declaration in declarations.iter() {
         match declaration {
-            ast::Declaration::Input { entity_id, number, source_loc } => {
+            ast::Declaration::Input {
+                entity_id,
+                number,
+                source_loc,
+            } => {
                 if let Some((_, first_loc)) = result.get(entity_id) {
                     return Err(DuplicateEntityError {
                         name: entity_id.clone(),
@@ -106,7 +107,11 @@ fn collect_entities(
                     result.insert(entity_id.clone(), (Input(*number), *source_loc));
                 }
             }
-            ast::Declaration::Output { entity_id, number, source_loc } => {
+            ast::Declaration::Output {
+                entity_id,
+                number,
+                source_loc,
+            } => {
                 if let Some((_, first_loc)) = result.get(entity_id) {
                     return Err(DuplicateEntityError {
                         name: entity_id.clone(),
@@ -155,11 +160,7 @@ fn handle_statement(
     }
 }
 
-fn handle_action(
-    program: &mut bytecode::Program,
-    entities: &Entities,
-    action: &ast::Action,
-) {
+fn handle_action(program: &mut bytecode::Program, entities: &Entities, action: &ast::Action) {
     match action {
         ast::Action::Toggle(output) => {
             let number = retrieve_output(entities, output).unwrap();

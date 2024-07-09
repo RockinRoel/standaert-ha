@@ -1,4 +1,6 @@
-use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement};
+use crate::shal::ast::{
+    Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement,
+};
 use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -321,7 +323,9 @@ fn handle_edge(pair: Pair<Rule>) -> Edge {
 
 #[cfg(test)]
 mod tests {
-    use crate::shal::ast::{Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement};
+    use crate::shal::ast::{
+        Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement,
+    };
     use crate::shal::common;
     use crate::shal::common::{IsWas, Value};
     use crate::shal::parser::parse;

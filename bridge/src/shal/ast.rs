@@ -11,8 +11,16 @@ pub(crate) struct Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Declaration {
-    Input { entity_id: String, number: u8, source_loc: Option<SourceLoc> },
-    Output { entity_id: String, number: u8, source_loc: Option<SourceLoc> },
+    Input {
+        entity_id: String,
+        number: u8,
+        source_loc: Option<SourceLoc>,
+    },
+    Output {
+        entity_id: String,
+        number: u8,
+        source_loc: Option<SourceLoc>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
