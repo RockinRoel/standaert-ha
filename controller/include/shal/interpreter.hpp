@@ -156,9 +156,6 @@ namespace StandaertHA::Shal::Interpreter {
 
     // Load program from EEPROM, and verify
     bool load();
-
-  private:
-    [[nodiscard]] static uint16_t calcCrc(const uint8_t* buffer, uint16_t length) noexcept;
   };
 
   static_assert(sizeof(Program) == PROGRAM_SIZE);

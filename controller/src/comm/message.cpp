@@ -15,8 +15,9 @@
 
 #include "comm/message.hpp"
 
+#include "util/crc.hpp"
+
 #include <string.h>
-#include <util/crc16.h>
 
 namespace StandaertHA::Comm {
 
@@ -33,12 +34,9 @@ uint16_t Message::calc_crc() const noexcept
 
 uint16_t Message::calc_crc(MessageType type, const uint8_t* body, uint8_t body_length) noexcept
 {
-  uint16_t crc = 0;
-  crc = _crc_xmodem_update(crc, static_cast<uint8_t>(type));
-  for (uint8_t i = 0; i < body_length; ++i) {
-    // Note: strictly speaking this is UB, but it works
-    crc = _crc_xmodem_update(crc, body[i]);
-  }
+  const auto type_byte = static_cast<uint8_t>(type);
+  uint16_t crc = Util::CRC::calc_crc(&type_byte, 1);
+  crc = Util::CRC::update_crc(crc, body, body_length);
   return crc;
 }
 

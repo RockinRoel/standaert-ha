@@ -18,9 +18,9 @@
 #include "messages.hpp"
 
 #include "comm/serial.hpp"
+#include "util/crc.hpp"
 
 #include <avr/eeprom.h>
-#include <util/crc16.h>
 
 namespace StandaertHA::Shal::Interpreter {
 
@@ -221,7 +221,7 @@ namespace StandaertHA::Shal::Interpreter {
       return false;
     }
 
-    uint16_t crc = calcCrc(code_, header_.length());
+    uint16_t crc = Util::CRC::calc_crc(code_, header_.length());
 
     return header_.crc() == crc;
   }
@@ -230,7 +230,7 @@ namespace StandaertHA::Shal::Interpreter {
   {
     using namespace Bytecode;
     code_[0] = INSTR_END;
-    header_ = ProgramHeader(1, calcCrc(code_, 1));
+    header_ = ProgramHeader(1, Util::CRC::calc_crc(code_, 1));
   }
 
   void Program::save()
@@ -266,18 +266,6 @@ namespace StandaertHA::Shal::Interpreter {
     }
 
     return true;
-  }
-
-  uint16_t Program::calcCrc(const uint8_t *buffer, uint16_t length) noexcept
-  {
-    if (length > sizeof(code_)) {
-      return UINT16_MAX;
-    }
-    uint16_t crc = 0;
-    for (auto i = UINT16_C(0); i < length; ++i) {
-      crc = _crc_xmodem_update(crc, buffer[i]);
-    }
-    return crc;
   }
 
 }
