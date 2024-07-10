@@ -7,10 +7,14 @@ use crate::handlers::programmer::State::{AwaitingAck, Uploading};
 use crate::shal::{bytecode, compiler, parser};
 use std::io;
 use thiserror::Error;
-use tokio::sync::broadcast::Sender;
+use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{select, spawn};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio_util::sync::CancellationToken;
+use crate::handlers::programmer::HandleMessageResult::{Continue, Done};
+use crate::shal::bytecode::Program;
 
 #[derive(Copy, Clone)]
 enum State {
@@ -32,79 +36,123 @@ pub enum ProgrammerError {
     ProgramSizeError(#[from] bytecode::ProgramSizeError),
 }
 
-pub async fn start(
-    program_path: String,
-    sender: Sender<Message>,
+struct Programmer {
+    tx: Sender<Message>,
+    rx: Receiver<Message>,
+    state: State,
+    program: Program,
     cancellation_token: CancellationToken,
-) -> Result<JoinHandle<()>, ProgrammerError> {
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum HandleMessageResult {
+    Done,
+    Continue,
+}
+
+pub async fn compile(program_path: &str) -> Result<Program, ProgrammerError> {
     let program_str = tokio::fs::read_to_string(&program_path).await?;
     let program_ast = parser::parse(&program_str)?;
     let program = compiler::compile(&program_ast)?;
     let _stack_depth = program.check_stack_depth(Some(32))?;
     let _program_size = program.check_program_size(Some(248))?;
 
+    Ok(program)
+}
+
+pub fn start(
+    program: Program,
+    sender: Sender<Message>,
+    cancellation_token: CancellationToken,
+) -> JoinHandle<()> {
     sender
         .send(SendToController(ProgramStart {
             header: program.header(),
         }))
         .unwrap_or_else(|_| unreachable!());
 
-    Ok(spawn(async move {
-        let mut receiver = sender.subscribe();
-        let mut state = AwaitingAck;
+    let rx = sender.subscribe();
+    let mut programmer = Programmer {
+        tx: sender,
+        rx,
+        state: AwaitingAck,
+        program,
+        cancellation_token,
+    };
+
+    spawn(async move { programmer.run().await })
+}
+
+impl Programmer {
+    async fn run(&mut self) {
         loop {
             select! {
-                message = receiver.recv() => match message {
-                    Ok(ReceivedFromController(body)) => {
-                        match (state, body) {
-                            (AwaitingAck, ProgramStartAck { header }) => {
-                                if header == program.header() {
-                                    let buf: Vec<u8> = (&program).into();
-                                    let chunks: Vec<&[u8]> = buf[PROGRAM_HEADER_LENGTH..]
-                                        .chunks(MAX_MESSAGE_BODY_LENGTH)
-                                        .collect();
-                                    let num_chunks = chunks.len();
-                                    for chunk in chunks.iter().take(num_chunks - 1) {
-                                        sender
-                                            .send(SendToController(MessageBody::ProgramData {
-                                                code: (*chunk).into(),
-                                            }))
-                                            .unwrap_or_else(|_| unreachable!());
-                                    }
-                                    let last_chunk = *chunks.last().unwrap_or(&&[][..]);
-                                    sender
-                                        .send(SendToController(MessageBody::ProgramEnd {
-                                            code: last_chunk.into(),
-                                        }))
-                                        .unwrap_or_else(|_| unreachable!());
-                                    state = Uploading;
-                                } else {
-                                    sender.send(SendToController(
-                                        ProgramStart {
-                                            header: program.header(),
-                                        }
-                                    )).unwrap_or_else(|_| unreachable!());
-                                }
-                            }
-                            (Uploading, ProgramEndAck { header }) => {
-                                if header == program.header() {
-                                    break; // Done!
-                                } else {
-                                    sender.send(SendToController(
-                                        ProgramStart {
-                                            header: program.header(),
-                                        }
-                                    )).unwrap_or_else(|_| unreachable!());
-                                }
-                            }
-                            (_, _) => {}
-                        }
-                    }
-                    Ok(_) => {}
-                    Err(_) => break,
+                message = self.rx.recv() => if self.handle_message(&message) == Done {
+                    break;
                 },
-                _ = cancellation_token.cancelled() => break,
+                _ = self.cancellation_token.cancelled() => break,
             }
         }
-    }))
+    }
+
+    fn handle_message(&mut self, message: &Result<Message, RecvError>) -> HandleMessageResult {
+        match message {
+            Ok(ReceivedFromController(body)) => {
+                match (self.state, body) {
+                    (AwaitingAck, ProgramStartAck { header }) => {
+                        if *header == self.program.header() {
+                            self.upload();
+                        } else {
+                            self.retry();
+                        }
+                    }
+                    (Uploading, ProgramEndAck { header }) => {
+                        if *header == self.program.header() {
+                            return Done;
+                        } else {
+                            self.retry();
+                        }
+                    }
+                    (_, _) => {}
+                }
+            }
+            Ok(_) => {}
+            Err(Lagged(num_messages)) => {
+                eprintln!("Programmer lagging behind {num_messages} messages!");
+            }
+            Err(Closed) => return Done,
+        }
+        Continue
+    }
+
+    fn upload(&mut self) {
+        let buf: Vec<u8> = (&self.program).into();
+        let chunks: Vec<&[u8]> = buf[PROGRAM_HEADER_LENGTH..]
+            .chunks(MAX_MESSAGE_BODY_LENGTH)
+            .collect();
+        let num_chunks = chunks.len();
+        for chunk in chunks.iter().take(num_chunks - 1) {
+            self.tx
+                .send(SendToController(MessageBody::ProgramData {
+                    code: (*chunk).into(),
+                }))
+                .unwrap_or_else(|_| unreachable!());
+        }
+        let last_chunk = *chunks.last().unwrap_or(&&[][..]);
+        self.tx
+            .send(SendToController(MessageBody::ProgramEnd {
+                code: last_chunk.into(),
+            }))
+            .unwrap_or_else(|_| unreachable!());
+        self.state = Uploading;
+    }
+
+    fn retry(&mut self) {
+        self.tx.send(SendToController(
+            ProgramStart {
+                header: self.program.header(),
+            }
+        )).unwrap_or_else(|_| unreachable!());
+        self.state = AwaitingAck;
+    }
 }

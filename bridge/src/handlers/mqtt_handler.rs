@@ -12,6 +12,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
+use crate::shal::bytecode::Program;
 
 struct MqttHandlerClientTask {
     client: AsyncClient,
@@ -39,6 +40,7 @@ pub async fn start(
     url: String,
     credentials: Option<(String, String)>,
     prefix: String,
+    _program: Option<Program>,
     tx: Sender<Message>,
     cancellation_token: CancellationToken,
 ) -> Result<JoinHandle<()>, MqttHandlerError> {

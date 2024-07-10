@@ -37,7 +37,10 @@ impl Logger {
                         }
                     }
                 }
-                _ = self.cancellation_token.cancelled() => break,
+                _ = self.cancellation_token.cancelled() => {
+                    eprintln!("Logger shutting down...");
+                    break
+                }
             }
         }
     }

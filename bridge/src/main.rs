@@ -129,6 +129,11 @@ async fn spawn_tasks(
         ));
     }
 
+    let mut program = None;
+    if let Some(program_path) = &args.program {
+        program = Some(programmer::compile(program_path).await?);
+    }
+
     if let Some(mqtt_url) = &args.mqtt_url {
         let mut credentials = None;
         if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
@@ -138,6 +143,7 @@ async fn spawn_tasks(
             mqtt_url.clone(),
             credentials,
             args.prefix.clone(),
+            program.clone(),
             sender.clone(),
             cancellation_token.clone(),
         )
@@ -157,10 +163,8 @@ async fn spawn_tasks(
         tasks.push(task);
     }
 
-    if let Some(program) = &args.program {
-        let task =
-            programmer::start(program.clone(), sender.clone(), cancellation_token.clone()).await?;
-        tasks.push(task);
+    if let Some(program) = program {
+        tasks.push(programmer::start(program, sender.clone(), cancellation_token.clone()));
     }
 
     tasks.push(refresher::start(sender.clone(), cancellation_token.clone()));

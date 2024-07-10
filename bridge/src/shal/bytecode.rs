@@ -166,7 +166,7 @@ pub(super) enum Instruction {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct DecodingError {}
+pub struct DecodingError {}
 
 impl Instruction {
     fn byte_size(&self) -> usize {
@@ -269,8 +269,8 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub(crate) struct Program {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Program {
     pub(super) instructions: Vec<Instruction>,
     pub(super) source_locations: Vec<SourceLoc>,
 }
