@@ -1,138 +1,110 @@
-use crate::controller::message::MessageBody::{ProgramEndAck, ProgramStartAck};
+use crate::controller::message::MessageBody::{ProgramEndAck, ProgramStart, ProgramStartAck};
 use crate::controller::message::{MessageBody, MAX_MESSAGE_BODY_LENGTH};
 use crate::controller::program_header::PROGRAM_HEADER_LENGTH;
-use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
-use crate::handlers::message::Message::ReceivedFromController;
-use crate::handlers::programmer::State::Neutral;
-use crate::shal::bytecode::Program;
-use crate::shal::{compiler, parser};
-use tokio::sync::mpsc::UnboundedSender;
+use crate::handlers::message::Message::{ReceivedFromController, SendToController};
+use crate::handlers::programmer::State::{AwaitingAck, Uploading};
+use crate::shal::{bytecode, compiler, parser};
+use std::io;
+use thiserror::Error;
+use tokio::sync::broadcast::Sender;
+use tokio::task::JoinHandle;
+use tokio::{select, spawn};
+use tokio_util::sync::CancellationToken;
 
+#[derive(Copy, Clone)]
 enum State {
-    Neutral,
     AwaitingAck,
     Uploading,
 }
 
-pub struct Programmer {
+#[derive(Debug, Error)]
+pub enum ProgrammerError {
+    #[error("Error reading program")]
+    IOError(#[from] io::Error),
+    #[error("Error parsing program")]
+    ParseError(#[from] parser::ParseError),
+    #[error("Error compiling program")]
+    CompileError(#[from] compiler::CompileError),
+    #[error("Stack limit error")]
+    StackLimitError(#[from] bytecode::StackLimitError),
+    #[error("Program size error")]
+    ProgramSizeError(#[from] bytecode::ProgramSizeError),
+}
+
+pub async fn start(
     program_path: String,
-    state: State,
-    program: Option<Program>,
-    sender: UnboundedSender<Message>,
-}
+    sender: Sender<Message>,
+    cancellation_token: CancellationToken,
+) -> Result<JoinHandle<()>, ProgrammerError> {
+    let program_str = tokio::fs::read_to_string(&program_path).await?;
+    let program_ast = parser::parse(&program_str)?;
+    let program = compiler::compile(&program_ast)?;
+    let _stack_depth = program.check_stack_depth(Some(32))?;
+    let _program_size = program.check_program_size(Some(248))?;
 
-impl Programmer {
-    pub fn new(program_path: String, sender: UnboundedSender<Message>) -> Self {
-        Programmer {
-            program_path,
-            state: Neutral,
-            program: None,
-            sender,
-        }
-    }
-}
+    sender
+        .send(SendToController(ProgramStart {
+            header: program.header(),
+        }))
+        .unwrap_or_else(|_| unreachable!());
 
-impl Programmer {
-    fn reload_program(&mut self) {
-        // TODO(Roel): handle errors!
-        let program_str =
-            std::fs::read_to_string(&self.program_path).expect("Failed to read program!");
-        let program_ast = parser::parse(&program_str).expect("Failed to parse program!");
-        let program_bytecode = compiler::compile(&program_ast);
-        if let Err(error) = &program_bytecode {
-            eprintln!("Compilation failed due to error: {}", error);
-            return; // TODO(Roel): return error?
-        }
-        let program_bytecode = program_bytecode.unwrap_or_else(|_| unreachable!());
-        let _stack_depth = program_bytecode
-            .check_stack_depth(Some(32))
-            .expect("Stack too deep!");
-        let _program_length = program_bytecode
-            .check_program_length(Some(248))
-            .expect("Program too long!");
-
-        self.program = Some(program_bytecode);
-        self.announce_program_start();
-    }
-
-    fn reset(&mut self) {
-        self.state = Neutral;
-        self.program = None;
-    }
-
-    fn announce_program_start(&mut self) {
-        match &self.program {
-            Some(program) => {
-                self.sender
-                    .send(Message::SendToController(MessageBody::ProgramStart {
-                        header: program.header(),
-                    }))
-                    .unwrap_or_else(|_| unreachable!());
-                self.state = State::AwaitingAck;
-            }
-            _ => {
-                // Wrong state?
-            }
-        }
-    }
-
-    fn upload(&mut self) {
-        match (&self.state, &self.program) {
-            (State::AwaitingAck, Some(program)) => {
-                let buf: Vec<u8> = program.into();
-                let chunks: Vec<&[u8]> = buf[PROGRAM_HEADER_LENGTH..]
-                    .chunks(MAX_MESSAGE_BODY_LENGTH)
-                    .collect();
-                let num_chunks = chunks.len();
-                for chunk in chunks.iter().take(num_chunks - 1) {
-                    self.sender
-                        .send(Message::SendToController(MessageBody::ProgramData {
-                            code: (*chunk).into(),
-                        }))
-                        .unwrap_or_else(|_| unreachable!());
-                }
-                let last_chunk = *chunks.last().unwrap_or(&&[][..]);
-                self.sender
-                    .send(Message::SendToController(MessageBody::ProgramEnd {
-                        code: last_chunk.into(),
-                    }))
-                    .unwrap_or_else(|_| unreachable!());
-                self.state = State::Uploading;
-            }
-            _ => {
-                panic!("Upload called when in wrong state, or when there was no program!");
+    Ok(spawn(async move {
+        let mut receiver = sender.subscribe();
+        let mut state = AwaitingAck;
+        loop {
+            select! {
+                message = receiver.recv() => match message {
+                    Ok(ReceivedFromController(body)) => {
+                        match (state, body) {
+                            (AwaitingAck, ProgramStartAck { header }) => {
+                                if header == program.header() {
+                                    let buf: Vec<u8> = (&program).into();
+                                    let chunks: Vec<&[u8]> = buf[PROGRAM_HEADER_LENGTH..]
+                                        .chunks(MAX_MESSAGE_BODY_LENGTH)
+                                        .collect();
+                                    let num_chunks = chunks.len();
+                                    for chunk in chunks.iter().take(num_chunks - 1) {
+                                        sender
+                                            .send(SendToController(MessageBody::ProgramData {
+                                                code: (*chunk).into(),
+                                            }))
+                                            .unwrap_or_else(|_| unreachable!());
+                                    }
+                                    let last_chunk = *chunks.last().unwrap_or(&&[][..]);
+                                    sender
+                                        .send(SendToController(MessageBody::ProgramEnd {
+                                            code: last_chunk.into(),
+                                        }))
+                                        .unwrap_or_else(|_| unreachable!());
+                                    state = Uploading;
+                                } else {
+                                    sender.send(SendToController(
+                                        ProgramStart {
+                                            header: program.header(),
+                                        }
+                                    )).unwrap_or_else(|_| unreachable!());
+                                }
+                            }
+                            (Uploading, ProgramEndAck { header }) => {
+                                if header == program.header() {
+                                    break; // Done!
+                                } else {
+                                    sender.send(SendToController(
+                                        ProgramStart {
+                                            header: program.header(),
+                                        }
+                                    )).unwrap_or_else(|_| unreachable!());
+                                }
+                            }
+                            (_, _) => {}
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(_) => break,
+                },
+                _ = cancellation_token.cancelled() => break,
             }
         }
-    }
-}
-
-impl Handler for Programmer {
-    fn handle(&mut self, message: &Message) -> HandleResult {
-        match (&self.state, &self.program, message) {
-            (
-                State::AwaitingAck,
-                Some(program),
-                ReceivedFromController(ProgramStartAck { header }),
-            ) => {
-                if &program.header() == header {
-                    self.upload();
-                } else {
-                    self.announce_program_start();
-                }
-            }
-            (State::Uploading, Some(program), ReceivedFromController(ProgramEndAck { header })) => {
-                if &program.header() == header {
-                    self.reset();
-                } else {
-                    self.announce_program_start();
-                }
-            }
-            (_, _, Message::ReloadProgram) => {
-                self.reload_program();
-            }
-            _ => {}
-        }
-        HandleResult::Continue
-    }
+    }))
 }

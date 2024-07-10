@@ -277,13 +277,13 @@ pub(crate) struct Program {
 
 #[derive(Copy, Clone, Error, Debug, Eq, PartialEq)]
 #[error("Stack limit error")]
-pub(crate) struct StackLimitError {
+pub struct StackLimitError {
     source_location: Option<SourceLoc>,
 }
 
 #[derive(Copy, Clone, Error, Debug, Eq, PartialEq)]
 #[error("Program size error")]
-pub(crate) struct ProgramSizeError {
+pub struct ProgramSizeError {
     source_location: Option<SourceLoc>,
 }
 
@@ -313,7 +313,7 @@ impl Program {
         Ok(max)
     }
 
-    pub(crate) fn check_program_length(
+    pub(crate) fn check_program_size(
         &self,
         limit: Option<usize>,
     ) -> Result<usize, ProgramSizeError> {
@@ -332,7 +332,7 @@ impl Program {
     }
 
     pub(crate) fn calc_length(&self) -> usize {
-        self.check_program_length(None)
+        self.check_program_size(None)
             .unwrap_or_else(|_| unreachable!())
     }
 
@@ -493,12 +493,12 @@ mod tests {
             }),
             program.check_stack_depth(Some(1))
         );
-        assert_eq!(Ok(22), program.check_program_length(None));
+        assert_eq!(Ok(22), program.check_program_size(None));
         assert_eq!(
             Err(ProgramSizeError {
                 source_location: None
             }),
-            program.check_program_length(Some(21))
+            program.check_program_size(Some(21))
         );
         let encoded: Vec<u8> = (&program).into();
         assert_eq!(

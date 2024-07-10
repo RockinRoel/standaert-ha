@@ -2,23 +2,17 @@ pub mod controller;
 pub mod handlers;
 pub mod shal;
 
-use crate::controller::command::Command;
-use crate::controller::message::MessageBody;
-use crate::handlers::handler::Handler;
-use crate::handlers::handler_chain::HandlerChain;
-use crate::handlers::logger::Logger;
-use crate::handlers::message::Message::Stop;
-use crate::handlers::mqtt_handler::MqttHandler;
-use crate::handlers::programmer::Programmer;
-use crate::handlers::serial_handler::SerialHandler;
+use crate::handlers::message::Message;
+use crate::handlers::{logger, mqtt_handler, programmer, refresher, serial_handler};
 use anyhow::Result;
 use clap::Parser;
 use futures::future::join_all;
 use std::fmt::{Display, Formatter};
-use std::time::Duration;
-use tokio::signal;
-use tokio::sync::mpsc;
-use tokio::time::sleep;
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender;
+use tokio::task::JoinHandle;
+use tokio::{select, signal};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -99,13 +93,40 @@ async fn main() -> Result<()> {
 
     println!("Starting SHA bridge with arguments:\n{}", args);
 
-    let (sender, mut receiver) = mpsc::unbounded_channel();
+    let (sender, _receiver) = broadcast::channel(100);
+    let cancellation_token = CancellationToken::new();
 
-    let mut chain = HandlerChain::new();
     let mut tasks = vec![];
 
+    let result = spawn_tasks(&mut tasks, &args, &sender, cancellation_token.clone()).await;
+
+    if let Ok(()) = result {
+        select! {
+            _ = cancellation_token.cancelled() => {}
+            _ = signal::ctrl_c() => cancellation_token.cancel(),
+        }
+    } else {
+        // Error occurred, cleanly terminate all started tasks
+        cancellation_token.cancel();
+    }
+
+    // TODO(Roel): tasks may exit with error?
+    join_all(tasks).await;
+
+    result
+}
+
+async fn spawn_tasks(
+    tasks: &mut Vec<JoinHandle<()>>,
+    args: &Args,
+    sender: &Sender<Message>,
+    cancellation_token: CancellationToken,
+) -> Result<()> {
     if args.debug {
-        chain.add_handler(Logger);
+        tasks.push(logger::start(
+            sender.subscribe(),
+            cancellation_token.clone(),
+        ));
     }
 
     if let Some(mqtt_url) = &args.mqtt_url {
@@ -113,61 +134,36 @@ async fn main() -> Result<()> {
         if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
             credentials = Some((user.clone(), password.clone()));
         }
-        let (handler, task) =
-            MqttHandler::new(mqtt_url.clone(), credentials, args.prefix, sender.clone())?;
-        chain.add_handler(handler);
+        let task = mqtt_handler::start(
+            mqtt_url.clone(),
+            credentials,
+            args.prefix.clone(),
+            sender.clone(),
+            cancellation_token.clone(),
+        )
+        .await?;
         tasks.push(task);
 
-        sleep(Duration::from_secs(1)).await;
+        // TODO(Roel): we should wait until we're done with init?
     }
 
     if let Some(serial_port) = &args.serial {
-        let (handler, task) = SerialHandler::new(serial_port.clone(), sender.clone());
-        chain.add_handler(handler);
+        let task = serial_handler::start(
+            serial_port.clone(),
+            sender.clone(),
+            cancellation_token.clone(),
+        )
+        .await?;
         tasks.push(task);
-
-        sleep(Duration::from_secs(1)).await;
     }
 
     if let Some(program) = &args.program {
-        chain.add_handler(Programmer::new(program.clone(), sender.clone()));
-
-        sleep(Duration::from_secs(1)).await;
+        let task =
+            programmer::start(program.clone(), sender.clone(), cancellation_token.clone()).await?;
+        tasks.push(task);
     }
 
-    sender
-        .send(handlers::message::Message::ReloadProgram)
-        .unwrap_or_else(|_| unreachable!());
-
-    sleep(Duration::from_secs(1)).await;
-
-    sender
-        .send(handlers::message::Message::SendToController(
-            MessageBody::Command {
-                commands: vec![Command::Refresh],
-            },
-        ))
-        .unwrap_or_else(|_| unreachable!());
-
-    sleep(Duration::from_secs(1)).await;
-
-    loop {
-        tokio::select! {
-            message = receiver.recv() => {
-                if let Some(message) = message {
-                    chain.handle(&message);
-                } else {
-                    unreachable!();
-                }
-            },
-            _ = signal::ctrl_c() => {
-                chain.handle(&Stop);
-                break;
-            }
-        }
-    }
-
-    join_all(tasks).await;
+    tasks.push(refresher::start(sender.clone(), cancellation_token.clone()));
 
     Ok(())
 }

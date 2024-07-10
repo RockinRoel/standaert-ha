@@ -1,37 +1,32 @@
 use crate::controller::command::Command;
 use crate::controller::event::Event;
 use crate::controller::message::MessageBody;
-use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
+use crate::handlers::message::Message::ReceivedFromController;
 use if_chain::if_chain;
 use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
 
-pub struct MqttHandler {
-    mqtt_sender: UnboundedSender<MessageBody>,
-    cancellation_token: CancellationToken,
-}
-
 struct MqttHandlerClientTask {
     client: AsyncClient,
-    mqtt_receiver: UnboundedReceiver<MessageBody>,
-    cancellation_token: CancellationToken,
+    rx: Receiver<Message>,
     options: MqttOptions,
     prefix: String,
+    cancellation_token: CancellationToken,
 }
 
 struct MqttHandlerEventLoopTask {
     event_loop: EventLoop,
-    cancellation_token: CancellationToken,
-    sender: UnboundedSender<Message>,
+    tx: Sender<Message>,
     options: MqttOptions,
     prefix: String,
+    cancellation_token: CancellationToken,
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -40,51 +35,42 @@ pub enum MqttHandlerError {
     OptionError(#[from] OptionError),
 }
 
-impl MqttHandler {
-    pub fn new(
-        url: String,
-        credentials: Option<(String, String)>,
-        prefix: String,
-        sender: UnboundedSender<Message>,
-    ) -> Result<(Self, JoinHandle<()>), MqttHandlerError> {
-        let mut options = MqttOptions::parse_url(url)?;
-        if let Some(credentials) = credentials {
-            options.set_credentials(credentials.0, credentials.1);
-        }
-        let cancellation_token = CancellationToken::new();
-        let (mqtt_sender, mqtt_receiver) = tokio::sync::mpsc::unbounded_channel::<MessageBody>();
-        let (client, event_loop) = AsyncClient::new(options.clone(), 10);
-        let mut client_task = MqttHandlerClientTask {
-            client: client.clone(),
-            mqtt_receiver,
-            cancellation_token: cancellation_token.clone(),
-            options: options.clone(),
-            prefix: prefix.clone(),
-        };
-        let mut event_loop_task = MqttHandlerEventLoopTask {
-            event_loop,
-            cancellation_token: cancellation_token.clone(),
-            sender,
-            options: options.clone(),
-            prefix: prefix.clone(),
-        };
-        let client_task = tokio::spawn(async move {
-            client_task.run().await;
-        });
-        let event_loop_task = tokio::spawn(async move {
-            event_loop_task.run().await;
-        });
-        let task = tokio::spawn(async move {
-            let (_, _) = join!(client_task, event_loop_task);
-        });
-        Ok((
-            Self {
-                mqtt_sender,
-                cancellation_token,
-            },
-            task,
-        ))
+pub async fn start(
+    url: String,
+    credentials: Option<(String, String)>,
+    prefix: String,
+    tx: Sender<Message>,
+    cancellation_token: CancellationToken,
+) -> Result<JoinHandle<()>, MqttHandlerError> {
+    let mut options = MqttOptions::parse_url(url)?;
+    if let Some(credentials) = credentials {
+        options.set_credentials(credentials.0, credentials.1);
     }
+    let (client, event_loop) = AsyncClient::new(options.clone(), 10);
+    let mut client_task = MqttHandlerClientTask {
+        client: client.clone(),
+        rx: tx.subscribe(),
+        options: options.clone(),
+        prefix: prefix.clone(),
+        cancellation_token: cancellation_token.clone(),
+    };
+    let mut event_loop_task = MqttHandlerEventLoopTask {
+        event_loop,
+        tx,
+        options: options.clone(),
+        prefix: prefix.clone(),
+        cancellation_token,
+    };
+    // TODO(Roel): announce and subscribe here!!!
+    let client_task = tokio::spawn(async move {
+        client_task.run().await;
+    });
+    let event_loop_task = tokio::spawn(async move {
+        event_loop_task.run().await;
+    });
+    Ok(tokio::spawn(async move {
+        let (_, _) = join!(client_task, event_loop_task);
+    }))
 }
 
 impl MqttHandlerClientTask {
@@ -93,33 +79,58 @@ impl MqttHandlerClientTask {
         self.subscribe().await;
         loop {
             select! {
-                message = self.mqtt_receiver.recv() => {
-                    if let Some(MessageBody::Update { outputs, events}) = message {
-                        for i in 0..32 {
-                            let state_topic = format!("{}/light/{}/{}/status", self.prefix, self.options.client_id(), i);
-                            self.client.publish(
-                                state_topic,
-                                QoS::AtLeastOnce,
-                                true,
-                                if (outputs & (1 << i)) == 0 { "OFF" } else { "ON" },
-                            ).await.unwrap();
+                message = self.rx.recv() => {
+                    match message {
+                        Ok(ReceivedFromController(body)) => {
+                            self.handle_message_from_controller(&body).await;
                         }
-                        for event in &events {
-                            let (i, state) = match event {
-                                Event::RisingEdge(i) => (i, "OFF"),
-                                Event::FallingEdge(i) => (i, "ON"),
-                            };
-                            let state_topic = format!("{}/binary_sensor/{}/{}/pressed", self.prefix, self.options.client_id(), i);
-                            self.client.publish(
-                                state_topic,
-                                QoS::AtLeastOnce,
-                                true,
-                                state
-                            ).await.unwrap();
-                        }
+                        Ok(_) => {}
+                        Err(_) => break,
                     }
                 },
                 _ = self.cancellation_token.cancelled() => break,
+            }
+        }
+    }
+
+    async fn handle_message_from_controller(&mut self, body: &MessageBody) {
+        if let MessageBody::Update { outputs, events } = body {
+            for i in 0..32 {
+                let state_topic = format!(
+                    "{}/light/{}/{}/status",
+                    self.prefix,
+                    self.options.client_id(),
+                    i
+                );
+                self.client
+                    .publish(
+                        state_topic,
+                        QoS::AtLeastOnce,
+                        true,
+                        if (outputs & (1 << i)) == 0 {
+                            "OFF"
+                        } else {
+                            "ON"
+                        },
+                    )
+                    .await
+                    .unwrap(); // TODO(Roel): unwrap?
+            }
+            for event in events {
+                let (i, state) = match event {
+                    Event::RisingEdge(i) => (i, "OFF"),
+                    Event::FallingEdge(i) => (i, "ON"),
+                };
+                let state_topic = format!(
+                    "{}/binary_sensor/{}/{}/pressed",
+                    self.prefix,
+                    self.options.client_id(),
+                    i
+                );
+                self.client
+                    .publish(state_topic, QoS::AtLeastOnce, true, state)
+                    .await
+                    .unwrap(); // TODO(Roel): unwrap?
             }
         }
     }
@@ -233,7 +244,7 @@ impl MqttHandlerEventLoopTask {
                                         "OFF" => Command::Off(id),
                                         _ => continue,
                                     };
-                                    self.sender.send(Message::SendToController(
+                                    self.tx.send(Message::SendToController(
                                         MessageBody::Command {
                                             commands: vec![command],
                                         }
@@ -242,6 +253,7 @@ impl MqttHandlerEventLoopTask {
                             )
                         },
                         Err(err) => {
+                            // TODO(Roel): handle?
                             eprintln!("Connection error: {}", err);
                             break;
                         }
@@ -250,22 +262,5 @@ impl MqttHandlerEventLoopTask {
                 _ = self.cancellation_token.cancelled() => break,
             }
         }
-    }
-}
-
-impl Handler for MqttHandler {
-    fn handle(&mut self, message: &Message) -> HandleResult {
-        match message {
-            Message::ReceivedFromController(message_body) => {
-                self.mqtt_sender
-                    .send(message_body.clone())
-                    .unwrap_or_else(|_| unreachable!());
-            }
-            Message::Stop => {
-                self.cancellation_token.cancel();
-            }
-            _ => {}
-        }
-        HandleResult::Continue
     }
 }
