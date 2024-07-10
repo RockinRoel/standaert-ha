@@ -25,8 +25,7 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
         statements: vec![],
     };
 
-    let pest_program =
-        pest_program.expect("Fatal error: pest_program should not be none at this point");
+    let pest_program = pest_program.unwrap_or_else(|| unreachable!());
 
     for pair in pest_program.into_inner() {
         match pair.as_rule() {

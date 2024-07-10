@@ -68,7 +68,7 @@ impl Programmer {
                     .send(Message::SendToController(MessageBody::ProgramStart {
                         header: program.header(),
                     }))
-                    .expect("Could not send?"); // TODO(Roel): how to handle?
+                    .unwrap_or_else(|_| unreachable!());
                 self.state = State::AwaitingAck;
             }
             _ => {
@@ -90,14 +90,14 @@ impl Programmer {
                         .send(Message::SendToController(MessageBody::ProgramData {
                             code: (*chunk).into(),
                         }))
-                        .expect("Could not send?"); // TODO(Roel): how to handle?
+                        .unwrap_or_else(|_| unreachable!());
                 }
                 let last_chunk = *chunks.last().unwrap_or(&&[][..]);
                 self.sender
                     .send(Message::SendToController(MessageBody::ProgramEnd {
                         code: last_chunk.into(),
                     }))
-                    .expect("Could not send?"); // TODO(Roel): how to handle?
+                    .unwrap_or_else(|_| unreachable!());
                 self.state = State::Uploading;
             }
             _ => {

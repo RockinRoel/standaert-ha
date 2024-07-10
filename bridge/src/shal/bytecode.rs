@@ -333,7 +333,7 @@ impl Program {
 
     pub(crate) fn calc_length(&self) -> usize {
         self.check_program_length(None)
-            .expect("Check program length without limit yielded error?")
+            .unwrap_or_else(|_| unreachable!())
     }
 
     pub(crate) fn calc_crc(&self) -> u16 {
