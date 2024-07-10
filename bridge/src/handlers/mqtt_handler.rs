@@ -8,14 +8,12 @@ use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
-use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
+use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
 
 pub struct MqttHandler {
-    client_task: JoinHandle<()>,
-    event_loop_task: JoinHandle<()>,
     mqtt_sender: UnboundedSender<MessageBody>,
     cancellation_token: CancellationToken,
 }
@@ -48,7 +46,7 @@ impl MqttHandler {
         credentials: Option<(String, String)>,
         prefix: String,
         sender: UnboundedSender<Message>,
-    ) -> Result<Self, MqttHandlerError> {
+    ) -> Result<(Self, JoinHandle<()>), MqttHandlerError> {
         let mut options = MqttOptions::parse_url(url)?;
         if let Some(credentials) = credentials {
             options.set_credentials(credentials.0, credentials.1);
@@ -76,12 +74,16 @@ impl MqttHandler {
         let event_loop_task = tokio::spawn(async move {
             event_loop_task.run().await;
         });
-        Ok(Self {
-            client_task,
-            event_loop_task,
-            mqtt_sender,
-            cancellation_token,
-        })
+        let task = tokio::spawn(async move {
+            let (_, _) = join!(client_task, event_loop_task);
+        });
+        Ok((
+            Self {
+                mqtt_sender,
+                cancellation_token,
+            },
+            task,
+        ))
     }
 }
 
@@ -261,12 +263,6 @@ impl Handler for MqttHandler {
             }
             Message::Stop => {
                 self.cancellation_token.cancel();
-                while !self.client_task.is_finished() {
-                    // Busy wait??
-                }
-                while !self.event_loop_task.is_finished() {
-                    // Busy wait??
-                }
             }
             _ => {}
         }

@@ -7,14 +7,17 @@ use crate::controller::message::MessageBody;
 use crate::handlers::handler::Handler;
 use crate::handlers::handler_chain::HandlerChain;
 use crate::handlers::logger::Logger;
+use crate::handlers::message::Message::Stop;
 use crate::handlers::mqtt_handler::MqttHandler;
 use crate::handlers::programmer::Programmer;
 use crate::handlers::serial_handler::SerialHandler;
 use anyhow::Result;
 use clap::Parser;
+use futures::future::join_all;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use tokio::signal;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 #[derive(Parser, Debug)]
@@ -96,9 +99,10 @@ async fn main() -> Result<()> {
 
     println!("Starting SHA bridge with arguments:\n{}", args);
 
-    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (sender, mut receiver) = mpsc::unbounded_channel();
 
     let mut chain = HandlerChain::new();
+    let mut tasks = vec![];
 
     if args.debug {
         chain.add_handler(Logger);
@@ -109,14 +113,18 @@ async fn main() -> Result<()> {
         if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
             credentials = Some((user.clone(), password.clone()));
         }
-        let handler = MqttHandler::new(mqtt_url.clone(), credentials, args.prefix, sender.clone())?;
+        let (handler, task) =
+            MqttHandler::new(mqtt_url.clone(), credentials, args.prefix, sender.clone())?;
         chain.add_handler(handler);
+        tasks.push(task);
 
         sleep(Duration::from_secs(1)).await;
     }
 
     if let Some(serial_port) = &args.serial {
-        chain.add_handler(SerialHandler::new(serial_port.clone(), sender.clone()));
+        let (handler, task) = SerialHandler::new(serial_port.clone(), sender.clone());
+        chain.add_handler(handler);
+        tasks.push(task);
 
         sleep(Duration::from_secs(1)).await;
     }
@@ -148,17 +156,18 @@ async fn main() -> Result<()> {
             message = receiver.recv() => {
                 if let Some(message) = message {
                     chain.handle(&message);
-                    if message == handlers::message::Message::Stop {
-                        return Ok(())
-                    }
                 } else {
-                    // TODO(Roel): ???
+                    unreachable!();
                 }
             },
             _ = signal::ctrl_c() => {
-                sender.send(handlers::message::Message::Stop)
-                .unwrap_or_else(|_| unreachable!());
+                chain.handle(&Stop);
+                break;
             }
         }
     }
+
+    join_all(tasks).await;
+
+    Ok(())
 }
