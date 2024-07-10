@@ -13,6 +13,7 @@ use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
+use crate::shal::bytecode::Program;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -93,12 +94,17 @@ async fn main() -> Result<()> {
 
     println!("Starting SHA bridge with arguments:\n{}", args);
 
+    let mut program = None;
+    if let Some(program_path) = &args.program {
+        program = Some(programmer::compile(program_path).await?);
+    }
+
     let (sender, _receiver) = broadcast::channel(100);
     let cancellation_token = CancellationToken::new();
 
     let mut tasks = vec![];
 
-    let result = spawn_tasks(&mut tasks, &args, &sender, cancellation_token.clone()).await;
+    let result = spawn_tasks(&mut tasks, &args, program, &sender, cancellation_token.clone()).await;
 
     if let Ok(()) = result {
         select! {
@@ -119,6 +125,7 @@ async fn main() -> Result<()> {
 async fn spawn_tasks(
     tasks: &mut Vec<JoinHandle<()>>,
     args: &Args,
+    program: Option<Program>,
     sender: &Sender<Message>,
     cancellation_token: CancellationToken,
 ) -> Result<()> {
@@ -127,11 +134,6 @@ async fn spawn_tasks(
             sender.subscribe(),
             cancellation_token.clone(),
         ));
-    }
-
-    let mut program = None;
-    if let Some(program_path) = &args.program {
-        program = Some(programmer::compile(program_path).await?);
     }
 
     if let Some(mqtt_url) = &args.mqtt_url {
