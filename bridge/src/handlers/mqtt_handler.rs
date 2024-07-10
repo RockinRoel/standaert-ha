@@ -3,6 +3,7 @@ use crate::controller::event::Event;
 use crate::controller::message::MessageBody;
 use crate::handlers::handler::{HandleResult, Handler};
 use crate::handlers::message::Message;
+use if_chain::if_chain;
 use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -213,37 +214,34 @@ impl MqttHandlerEventLoopTask {
         loop {
             select! {
                 notification = self.event_loop.poll() => {
-                    if let Ok(rumqttc::Event::Incoming(Incoming::Publish(publish))) = notification {
-                        let prefix = format!("{}/light/{}/", self.prefix, self.options.client_id());
-                        if let Some(suffix) = publish.topic.strip_prefix(&prefix) {
-                            if let Some(id) = suffix.strip_suffix("/switch") {
-                                if let Ok(id) = id.parse::<u8>() {
-                                    if id < 32 {
-                                        if let Ok(payload) = String::from_utf8(publish.payload.to_vec()) {
-                                            match &payload[..] {
-                                                "ON" => {
-                                                    self.sender.send(Message::SendToController(
-                                                        MessageBody::Command {
-                                                            commands: vec![
-                                                                Command::On(id),
-                                                            ]
-                                                        }
-                                                    )).unwrap();
-                                                },
-                                                "OFF" => {
-                                                    self.sender.send(Message::SendToController(
-                                                        MessageBody::Command {
-                                                            commands: vec![
-                                                                Command::Off(id),
-                                                            ]
-                                                        }
-                                                    )).unwrap();
-                                                },
-                                            _ => {}}
+                    match notification {
+                        Ok(event) => {
+                            let prefix = format!("{}/light/{}/", self.prefix, self.options.client_id());
+                            if_chain!(
+                                if let rumqttc::Event::Incoming(incoming) = event;
+                                if let Incoming::Publish(publish) = incoming;
+                                if let Some(suffix) = publish.topic.strip_prefix(&prefix);
+                                if let Some(id) = suffix.strip_suffix("/switch");
+                                if let Ok(id) = id.parse::<u8>();
+                                if id < 32;
+                                if let Ok(payload) = String::from_utf8(publish.payload.to_vec());
+                                then {
+                                    let command = match &payload[..] {
+                                        "ON" => Command::On(id),
+                                        "OFF" => Command::Off(id),
+                                        _ => continue,
+                                    };
+                                    self.sender.send(Message::SendToController(
+                                        MessageBody::Command {
+                                            commands: vec![command],
                                         }
-                                    }
+                                    )).unwrap_or_else(|_| unreachable!());
                                 }
-                            }
+                            )
+                        },
+                        Err(err) => {
+                            eprintln!("Connection error: {}", err);
+                            break;
                         }
                     }
                 },
