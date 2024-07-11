@@ -54,6 +54,24 @@ impl MqttHandlerOptions {
         )
     }
 
+    fn input_id(&self, pin: u8) -> String {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some((id, _)) = program.declarations.inputs.iter().find(|(_, declaration)| declaration.pin == pin);
+            then {
+                id.clone()
+            } else {
+                format!("in{pin}")
+            }
+        )
+    }
+
+    fn unique_input_id(&self, pin: u8) -> String {
+        let client_id = &self.options.client_id();
+        let input_id = self.input_id(pin);
+        format!("{client_id}_input_{input_id}")
+    }
+
     fn output_name(&self, pin: u8) -> String {
         if_chain!(
             if let Some(program) = &self.program;
@@ -65,6 +83,24 @@ impl MqttHandlerOptions {
                 format!("Output {pin}")
             }
         )
+    }
+
+    fn output_id(&self, pin: u8) -> String {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some((id, _)) = program.declarations.outputs.iter().find(|(_, declaration)| declaration.pin == pin);
+            then {
+                id.clone()
+            } else {
+                format!("out{pin}")
+            }
+        )
+    }
+
+    fn unique_output_id(&self, pin: u8) -> String {
+        let client_id = &self.options.client_id();
+        let output_id = self.output_id(pin);
+        format!("{client_id}_output_{output_id}")
     }
 }
 
@@ -182,7 +218,7 @@ impl MqttHandlerClientTask {
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/pressed", prefix);
             let spec = BinarySensorSpec {
-                unique_id: format!("{}_input_{}", self.options.options.client_id(), i),
+                unique_id: self.options.unique_input_id(i),
                 name: self.options.input_name(i),
                 icon: "mdi:light-switch-off".to_string(),
                 state_topic: state_topic.clone(),
@@ -213,7 +249,7 @@ impl MqttHandlerClientTask {
             let state_topic = format!("{}/status", prefix);
             let command_topic = format!("{}/switch", prefix);
             let spec = LightSpec {
-                unique_id: format!("{}_output_{}", self.options.options.client_id(), i),
+                unique_id: self.options.unique_output_id(i),
                 name: self.options.output_name(i),
                 state_topic: state_topic.clone(),
                 command_topic: command_topic.clone(),
