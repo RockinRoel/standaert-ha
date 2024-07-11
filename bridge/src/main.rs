@@ -8,6 +8,7 @@ use anyhow::Result;
 use clap::Parser;
 use futures::future::join_all;
 use std::fmt::{Display, Formatter};
+use if_chain::if_chain;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
@@ -41,6 +42,10 @@ struct Args {
     /// Program location
     #[arg(long, env = "SHAL_PROGRAM")]
     program: Option<String>,
+
+    /// Determines whether we actually upload the program
+    #[arg(long, default_value_t = false, env = "SHA_UPLOAD")]
+    upload: bool,
 
     /// Verbose
     #[arg(long, default_value_t = false, env = "SHA_DEBUG")]
@@ -165,9 +170,13 @@ async fn spawn_tasks(
         tasks.push(task);
     }
 
-    if let Some(program) = program {
-        tasks.push(programmer::start(program, sender.clone(), cancellation_token.clone()));
-    }
+    if_chain!(
+        if let Some(program) = program;
+        if args.upload;
+        then {
+            tasks.push(programmer::start(program, sender.clone(), cancellation_token.clone()));
+        }
+    );
 
     tasks.push(refresher::start(sender.clone(), cancellation_token.clone()));
 
