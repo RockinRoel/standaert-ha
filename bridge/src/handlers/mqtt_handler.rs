@@ -5,7 +5,9 @@ use crate::handlers::message::Message;
 use crate::handlers::message::Message::ReceivedFromController;
 use crate::shal::bytecode::Program;
 use if_chain::if_chain;
-use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
+use rumqttc::{
+    AsyncClient, ClientError, ConnectionError, EventLoop, Incoming, MqttOptions, OptionError, QoS,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
@@ -135,10 +137,12 @@ pub async fn start(
     };
     // TODO(Roel): announce and subscribe here!!!
     let client_task = tokio::spawn(async move {
-        client_task.run().await;
+        // TODO(Roel): handle ClientError?
+        client_task.run().await.unwrap();
     });
     let event_loop_task = tokio::spawn(async move {
-        event_loop_task.run().await;
+        // TODO(Roel): handle ConnectionError?
+        event_loop_task.run().await.unwrap();
     });
     Ok(tokio::spawn(async move {
         let (_, _) = join!(client_task, event_loop_task);
@@ -146,26 +150,28 @@ pub async fn start(
 }
 
 impl MqttHandlerClientTask {
-    async fn run(&mut self) {
-        self.announce().await;
-        self.subscribe().await;
+    async fn run(&mut self) -> Result<(), ClientError> {
+        self.announce().await?;
+        self.subscribe().await?;
         loop {
             select! {
                 message = self.rx.recv() => {
                     match message {
-                        Ok(ReceivedFromController(body)) => {
-                            self.handle_message_from_controller(&body).await;
-                        }
+                        Ok(ReceivedFromController(body)) => self.handle_message_from_controller(&body).await?,
                         Ok(_) => {}
-                        Err(_) => break,
+                        Err(_) => break, // TODO(Roel): ok?
                     }
                 },
                 _ = self.options.cancellation_token.cancelled() => break,
             }
         }
+        Ok(())
     }
 
-    async fn handle_message_from_controller(&mut self, body: &MessageBody) {
+    async fn handle_message_from_controller(
+        &mut self,
+        body: &MessageBody,
+    ) -> Result<(), ClientError> {
         if let MessageBody::Update { outputs, events } = body {
             for i in 0..32 {
                 let state_topic = format!(
@@ -178,15 +184,14 @@ impl MqttHandlerClientTask {
                     .publish(
                         state_topic,
                         QoS::AtLeastOnce,
-                        true,
+                        false,
                         if (outputs & (1 << i)) == 0 {
                             "OFF"
                         } else {
                             "ON"
                         },
                     )
-                    .await
-                    .unwrap(); // TODO(Roel): unwrap?
+                    .await?;
             }
             for event in events {
                 let (i, state) = match event {
@@ -200,14 +205,14 @@ impl MqttHandlerClientTask {
                     i
                 );
                 self.client
-                    .publish(state_topic, QoS::AtLeastOnce, true, state)
-                    .await
-                    .unwrap(); // TODO(Roel): unwrap?
+                    .publish(state_topic, QoS::AtLeastOnce, false, state)
+                    .await?;
             }
         }
+        Ok(())
     }
 
-    async fn announce(&mut self) {
+    async fn announce(&mut self) -> Result<(), ClientError> {
         for i in 0..32 {
             let prefix = format!(
                 "{}/binary_sensor/{}/{}",
@@ -227,15 +232,13 @@ impl MqttHandlerClientTask {
                 .publish(
                     discovery_topic,
                     QoS::AtLeastOnce,
-                    true,
+                    false,
                     serde_json::to_string(&spec).unwrap(),
                 )
-                .await
-                .unwrap();
+                .await?;
             self.client
-                .publish(state_topic, QoS::AtLeastOnce, true, "OFF")
-                .await
-                .unwrap();
+                .publish(state_topic, QoS::AtLeastOnce, false, "OFF")
+                .await?;
         }
         // Announce lights
         for i in 0..32 {
@@ -258,28 +261,24 @@ impl MqttHandlerClientTask {
                 .publish(
                     discovery_topic,
                     QoS::AtLeastOnce,
-                    true,
+                    false,
                     serde_json::to_string(&spec).unwrap(),
                 )
-                .await
-                .unwrap();
+                .await?;
             self.client
-                .publish(state_topic, QoS::AtLeastOnce, true, "OFF")
-                .await
-                .unwrap();
+                .publish(state_topic, QoS::AtLeastOnce, false, "OFF")
+                .await?;
         }
+        Ok(())
     }
 
-    async fn subscribe(&mut self) {
+    async fn subscribe(&mut self) -> Result<(), ClientError> {
         let topic = format!(
             "{}/light/{}/+/switch",
             self.options.prefix,
             self.options.options.client_id()
         );
-        self.client
-            .subscribe(topic, QoS::AtLeastOnce)
-            .await
-            .unwrap();
+        self.client.subscribe(topic, QoS::AtLeastOnce).await
     }
 }
 
@@ -300,43 +299,37 @@ struct LightSpec {
 }
 
 impl MqttHandlerEventLoopTask {
-    async fn run(&mut self) {
+    async fn run(&mut self) -> Result<(), ConnectionError> {
         loop {
             select! {
-                notification = self.event_loop.poll() => {
-                    match notification {
-                        Ok(event) => {
-                            let prefix = format!("{}/light/{}/", self.options.prefix, self.options.options.client_id());
-                            if_chain!(
-                                if let rumqttc::Event::Incoming(incoming) = event;
-                                if let Incoming::Publish(publish) = incoming;
-                                if let Some(suffix) = publish.topic.strip_prefix(&prefix);
-                                if let Some(id) = suffix.strip_suffix("/switch");
-                                if let Ok(id) = id.parse::<u8>();
-                                if id < 32;
-                                if let Ok(payload) = String::from_utf8(publish.payload.to_vec());
-                                then {
-                                    let command = match &payload[..] {
-                                        "ON" => Command::On(id),
-                                        "OFF" => Command::Off(id),
-                                        _ => continue,
-                                    };
-                                    self.tx.send(Message::SendToController(
-                                        MessageBody::Command {
-                                            commands: vec![command],
-                                        }
-                                    )).unwrap_or_else(|_| unreachable!());
-                                }
-                            )
-                        },
-                        Err(err) => {
-                            // TODO(Roel): handle?
-                            eprintln!("Connection error: {}", err);
-                            break;
-                        }
-                    }
+                notification = self.event_loop.poll() => match notification {
+                    Ok(event) => {
+                        let prefix = format!("{}/light/{}/", self.options.prefix, self.options.options.client_id());
+                        if_chain!(
+                            if let rumqttc::Event::Incoming(incoming) = event;
+                            if let Incoming::Publish(publish) = incoming;
+                            if let Some(suffix) = publish.topic.strip_prefix(&prefix);
+                            if let Some(id) = suffix.strip_suffix("/switch");
+                            if let Ok(id) = id.parse::<u8>();
+                            if id < 32;
+                            if let Ok(payload) = String::from_utf8(publish.payload.to_vec());
+                            then {
+                                let command = match &payload[..] {
+                                    "ON" => Command::On(id),
+                                    "OFF" => Command::Off(id),
+                                    _ => continue,
+                                };
+                                self.tx.send(Message::SendToController(
+                                    MessageBody::Command {
+                                        commands: vec![command],
+                                    }
+                                )).unwrap_or_else(|_| unreachable!());
+                            }
+                        )
+                    },
+                    Err(err) => return Err(err),
                 },
-                _ = self.options.cancellation_token.cancelled() => break,
+                _ = self.options.cancellation_token.cancelled() => return Ok(()),
             }
         }
     }
