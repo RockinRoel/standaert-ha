@@ -3,18 +3,18 @@ use crate::controller::message::{MessageBody, MAX_MESSAGE_BODY_LENGTH};
 use crate::controller::program_header::PROGRAM_HEADER_LENGTH;
 use crate::handlers::message::Message;
 use crate::handlers::message::Message::{ReceivedFromController, SendToController};
+use crate::handlers::programmer::HandleMessageResult::{Continue, Done};
 use crate::handlers::programmer::State::{AwaitingAck, Uploading};
+use crate::shal::bytecode::Program;
 use crate::shal::{bytecode, compiler, parser};
 use std::io;
 use thiserror::Error;
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{select, spawn};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio_util::sync::CancellationToken;
-use crate::handlers::programmer::HandleMessageResult::{Continue, Done};
-use crate::shal::bytecode::Program;
 
 #[derive(Copy, Clone)]
 enum State {
@@ -97,25 +97,23 @@ impl Programmer {
 
     fn handle_message(&mut self, message: &Result<Message, RecvError>) -> HandleMessageResult {
         match message {
-            Ok(ReceivedFromController(body)) => {
-                match (self.state, body) {
-                    (AwaitingAck, ProgramStartAck { header }) => {
-                        if *header == self.program.header() {
-                            self.upload();
-                        } else {
-                            self.retry();
-                        }
+            Ok(ReceivedFromController(body)) => match (self.state, body) {
+                (AwaitingAck, ProgramStartAck { header }) => {
+                    if *header == self.program.header() {
+                        self.upload();
+                    } else {
+                        self.retry();
                     }
-                    (Uploading, ProgramEndAck { header }) => {
-                        if *header == self.program.header() {
-                            return Done;
-                        } else {
-                            self.retry();
-                        }
-                    }
-                    (_, _) => {}
                 }
-            }
+                (Uploading, ProgramEndAck { header }) => {
+                    if *header == self.program.header() {
+                        return Done;
+                    } else {
+                        self.retry();
+                    }
+                }
+                (_, _) => {}
+            },
             Ok(_) => {}
             Err(Lagged(num_messages)) => {
                 eprintln!("Programmer lagging behind {num_messages} messages!");
@@ -148,11 +146,11 @@ impl Programmer {
     }
 
     fn retry(&mut self) {
-        self.tx.send(SendToController(
-            ProgramStart {
+        self.tx
+            .send(SendToController(ProgramStart {
                 header: self.program.header(),
-            }
-        )).unwrap_or_else(|_| unreachable!());
+            }))
+            .unwrap_or_else(|_| unreachable!());
         self.state = AwaitingAck;
     }
 }

@@ -1,23 +1,23 @@
 use crate::controller;
+use crate::controller::command::Command;
 use crate::controller::message::{MessageBody, MAX_MESSAGE_BODY_LENGTH};
 use crate::handlers::message::Message;
+use crate::handlers::serial_handler::HandleResult::{Break, Continue};
 use futures::stream::StreamExt;
 use futures::SinkExt;
 use slip_codec::tokio::SlipCodec;
-use std::time::Duration;
 use slip_codec::SlipError;
+use std::time::Duration;
 use thiserror::Error;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio::{select, spawn};
-use tokio::sync::broadcast::error::RecvError;
 use tokio_serial::{SerialPortBuilderExt, SerialStream};
 use tokio_util::bytes::Bytes;
 use tokio_util::codec::{Decoder, Framed};
 use tokio_util::sync::CancellationToken;
-use crate::controller::command::Command;
-use crate::handlers::serial_handler::HandleResult::{Break, Continue};
 
 const BAUD_RATE: u32 = 9600;
 
@@ -82,7 +82,8 @@ impl SerialHandler {
             // TODO(Roel): is there some serial connection error that we should handle?
             Some(Ok(message)) => {
                 if let Ok(message) = controller::message::Message::try_from(&message[..]) {
-                    self.tx.send(Message::ReceivedFromController(message.body))
+                    self.tx
+                        .send(Message::ReceivedFromController(message.body))
                         .unwrap_or_else(|_| unreachable!());
                 }
             }
@@ -95,26 +96,29 @@ impl SerialHandler {
         Continue
     }
 
-    async fn handle_broadcast_message(&mut self, message: Result<Message, RecvError>) -> HandleResult {
+    async fn handle_broadcast_message(
+        &mut self,
+        message: Result<Message, RecvError>,
+    ) -> HandleResult {
         match message {
-            Ok(Message::SendToController(body)) => {
-                match body {
-                    MessageBody::Command { mut commands } => {
-                        self.commands_buffer.append(commands.as_mut());
-                    }
-                    _ => {
-                        let bytes: Vec<u8> = (&controller::message::Message::new(body)).into();
-                        self.framed_port.send(bytes.into()).await
-                            .unwrap_or_else(|_| unreachable!());
-                    }
+            Ok(Message::SendToController(body)) => match body {
+                MessageBody::Command { mut commands } => {
+                    self.commands_buffer.append(commands.as_mut());
                 }
-            }
-            Ok(_) => {},
+                _ => {
+                    let bytes: Vec<u8> = (&controller::message::Message::new(body)).into();
+                    self.framed_port
+                        .send(bytes.into())
+                        .await
+                        .unwrap_or_else(|_| unreachable!());
+                }
+            },
+            Ok(_) => {}
             Err(_) => return Break, // TODO(Roel): what to do on err?
         }
         Continue
     }
-    
+
     async fn send_commands(&mut self) {
         if self.commands_buffer.is_empty() {
             return;
@@ -124,7 +128,9 @@ impl SerialHandler {
                 commands: commands_chunk.to_vec(),
             };
             let bytes: Vec<u8> = (&controller::message::Message::new(message)).into();
-            self.framed_port.send(bytes.into()).await
+            self.framed_port
+                .send(bytes.into())
+                .await
                 .unwrap_or_else(|_| unreachable!());
         }
         self.commands_buffer.clear();

@@ -1,7 +1,7 @@
 use crate::shal::ast::{IODeclaration, IODeclarations};
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
-use crate::shal::compiler::CompileError::{UnknownEntityError};
+use crate::shal::compiler::CompileError::UnknownEntityError;
 use crate::shal::{ast, bytecode};
 use thiserror::Error;
 
@@ -49,7 +49,10 @@ fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<u
     }
 }
 
-fn retrieve_output(declarations: &IODeclarations, output: &ast::Output) -> Result<u8, CompileError> {
+fn retrieve_output(
+    declarations: &IODeclarations,
+    output: &ast::Output,
+) -> Result<u8, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
@@ -65,7 +68,10 @@ fn retrieve_output(declarations: &IODeclarations, output: &ast::Output) -> Resul
     }
 }
 
-fn retrieve_entity(declarations: &IODeclarations, entity_id: &str) -> Result<(u8, bytecode::InOut), CompileError> {
+fn retrieve_entity(
+    declarations: &IODeclarations,
+    entity_id: &str,
+) -> Result<(u8, bytecode::InOut), CompileError> {
     retrieve_input(declarations, &ast::Input::Entity(entity_id.to_string()))
         .map(|i| (i, bytecode::InOut::Input))
         .or_else(|_| {
@@ -87,10 +93,7 @@ pub(crate) fn compile(ast_program: &ast::Program) -> Result<bytecode::Program, C
     Ok(bytecode_program)
 }
 
-fn handle_statement(
-    program: &mut bytecode::Program,
-    statement: &ast::Statement,
-) {
+fn handle_statement(program: &mut bytecode::Program, statement: &ast::Statement) {
     match statement {
         ast::Statement::Action(action) => handle_action(program, action),
         ast::Statement::IfElse(condition, if_block, else_block) => {
@@ -143,10 +146,7 @@ fn handle_if_else(
     program.instructions.push(Instruction::Pop);
 }
 
-fn handle_condition(
-    program: &mut bytecode::Program,
-    condition: &ast::Condition,
-) {
+fn handle_condition(program: &mut bytecode::Program, condition: &ast::Condition) {
     match condition {
         ast::Condition::And(l, r) => {
             handle_condition(program, l.as_ref());
@@ -216,26 +216,41 @@ fn handle_event(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use crate::shal::ast;
     use crate::shal::ast::{IODeclaration, IODeclarations};
     use crate::shal::bytecode;
     use crate::shal::bytecode::Instruction;
     use crate::shal::common::{Edge, IsWas, Value};
     use crate::shal::compiler::compile;
+    use std::collections::HashMap;
 
     #[test]
     fn test_compile() {
         let ast_program = ast::Program {
             declarations: IODeclarations {
                 inputs: HashMap::from([
-                    ("button_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
-                    ("button_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                    (
+                        "button_downstairs".to_owned(),
+                        IODeclaration { pin: 0, name: None },
+                    ),
+                    (
+                        "button_upstairs".to_owned(),
+                        IODeclaration { pin: 1, name: None },
+                    ),
                 ]),
                 outputs: HashMap::from([
-                    ("light_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
-                    ("light_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
-                    ("light_stairs".to_owned(), IODeclaration { pin: 2, name: None }),
+                    (
+                        "light_downstairs".to_owned(),
+                        IODeclaration { pin: 0, name: None },
+                    ),
+                    (
+                        "light_upstairs".to_owned(),
+                        IODeclaration { pin: 1, name: None },
+                    ),
+                    (
+                        "light_stairs".to_owned(),
+                        IODeclaration { pin: 2, name: None },
+                    ),
                 ]),
             },
             statements: vec![
@@ -283,13 +298,28 @@ mod tests {
             &Ok(bytecode::Program {
                 declarations: IODeclarations {
                     inputs: HashMap::from([
-                        ("button_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
-                        ("button_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                        (
+                            "button_downstairs".to_owned(),
+                            IODeclaration { pin: 0, name: None }
+                        ),
+                        (
+                            "button_upstairs".to_owned(),
+                            IODeclaration { pin: 1, name: None }
+                        ),
                     ]),
                     outputs: HashMap::from([
-                        ("light_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
-                        ("light_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
-                        ("light_stairs".to_owned(), IODeclaration { pin: 2, name: None }),
+                        (
+                            "light_downstairs".to_owned(),
+                            IODeclaration { pin: 0, name: None }
+                        ),
+                        (
+                            "light_upstairs".to_owned(),
+                            IODeclaration { pin: 1, name: None }
+                        ),
+                        (
+                            "light_stairs".to_owned(),
+                            IODeclaration { pin: 2, name: None }
+                        ),
                     ]),
                 },
                 instructions: vec![

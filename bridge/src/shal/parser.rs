@@ -3,8 +3,8 @@ use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
-use thiserror::Error;
 use regex::RegexBuilder;
+use thiserror::Error;
 
 #[derive(Parser)]
 #[grammar = "shal/shal.pest"]
@@ -21,7 +21,10 @@ pub enum ParseError {
 pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
     let mut program = Program::default();
 
-    let separator = RegexBuilder::new(r"^---\s*$").multi_line(true).build().unwrap_or_else(|_| unreachable!());
+    let separator = RegexBuilder::new(r"^---\s*$")
+        .multi_line(true)
+        .build()
+        .unwrap_or_else(|_| unreachable!());
     let splits: Vec<&str> = separator.splitn(input, 2).collect();
     if splits.len() == 2 {
         let first_split = *splits.first().unwrap_or_else(|| unreachable!());
@@ -34,7 +37,9 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
     }
 
     let last_split = *splits.last().unwrap_or_else(|| unreachable!());
-    let pest_program = ShalParser::parse(Rule::program, last_split).map_err(Box::new)?.next();
+    let pest_program = ShalParser::parse(Rule::program, last_split)
+        .map_err(Box::new)?
+        .next();
 
     let pest_program = pest_program.unwrap_or_else(|| unreachable!());
 
@@ -46,43 +51,6 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
 
     Ok(program)
 }
-
-/*
-fn handle_entity_declaration(pair: Pair<Rule>) -> Declaration {
-    let declaration = pair.into_inner().next().unwrap();
-    match declaration.as_rule() {
-        Rule::input_declaration => handle_input_declaration(declaration),
-        Rule::output_declaration => handle_output_declaration(declaration),
-        _ => {
-            unimplemented!()
-        }
-    }
-}
-
-fn handle_input_declaration(pair: Pair<Rule>) -> Declaration {
-    let (line, col) = pair.line_col();
-    let mut pairs = pair.into_inner();
-    let entity_id = handle_entity_id(pairs.next().unwrap());
-    let input = handle_input(pairs.next().unwrap());
-    Declaration::Input {
-        entity_id,
-        number: input,
-        source_loc: Some(SourceLoc(line, col)),
-    }
-}
-
-fn handle_output_declaration(pair: Pair<Rule>) -> Declaration {
-    let (line, col) = pair.line_col();
-    let mut pairs = pair.into_inner();
-    let entity_id = handle_entity_id(pairs.next().unwrap());
-    let input = handle_output(pairs.next().unwrap());
-    Declaration::Output {
-        entity_id,
-        number: input,
-        source_loc: Some(SourceLoc(line, col)),
-    }
-}
-*/
 
 fn handle_statement(pair: Pair<Rule>) -> Statement {
     let statement = pair.into_inner().next().unwrap();
@@ -329,11 +297,13 @@ fn handle_edge(pair: Pair<Rule>) -> Edge {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use crate::shal::ast::{Action, Condition, Input, IODeclaration, IODeclarations, Output, Program, Statement};
+    use crate::shal::ast::{
+        Action, Condition, IODeclaration, IODeclarations, Input, Output, Program, Statement,
+    };
     use crate::shal::common;
     use crate::shal::common::{IsWas, Value};
     use crate::shal::parser::parse;
+    use std::collections::HashMap;
 
     #[test]
     fn test_parse() {
@@ -341,9 +311,13 @@ mod tests {
             &parse("{inputs: {button: {pin: 12}}}\n---\n").unwrap(),
             &Program {
                 declarations: IODeclarations {
-                    inputs: HashMap::from([
-                        ("button".to_owned(), IODeclaration { pin: 12, name: None }),
-                    ]),
+                    inputs: HashMap::from([(
+                        "button".to_owned(),
+                        IODeclaration {
+                            pin: 12,
+                            name: None
+                        }
+                    ),]),
                     outputs: Default::default(),
                 },
                 statements: vec![],
@@ -354,9 +328,13 @@ mod tests {
             &Program {
                 declarations: IODeclarations {
                     inputs: Default::default(),
-                    outputs: HashMap::from([
-                        ("light".to_owned(), IODeclaration { pin: 12, name: None }),
-                    ]),
+                    outputs: HashMap::from([(
+                        "light".to_owned(),
+                        IODeclaration {
+                            pin: 12,
+                            name: None
+                        }
+                    ),]),
                 },
                 statements: vec![],
             }
@@ -423,7 +401,8 @@ mod tests {
             }
         );
         assert_eq!(
-            &parse("if input 4 is low xor light_upstairs was high {} else { toggle output 4; }").unwrap(),
+            &parse("if input 4 is low xor light_upstairs was high {} else { toggle output 4; }")
+                .unwrap(),
             &Program {
                 declarations: Default::default(),
                 statements: vec![Statement::IfElse(

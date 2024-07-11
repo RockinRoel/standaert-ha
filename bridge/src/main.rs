@@ -4,17 +4,17 @@ pub mod shal;
 
 use crate::handlers::message::Message;
 use crate::handlers::{logger, mqtt_handler, programmer, refresher, serial_handler};
+use crate::shal::bytecode::Program;
 use anyhow::Result;
 use clap::Parser;
 use futures::future::join_all;
-use std::fmt::{Display, Formatter};
 use if_chain::if_chain;
+use std::fmt::{Display, Formatter};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
-use crate::shal::bytecode::Program;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -81,7 +81,9 @@ impl Display for Args {
             writeln!(f, "  Serial: <disabled>")?;
         }
         if let Some(program) = &self.program {
-            writeln!(f, "  Program path: {}", program)?;
+            writeln!(f, "  Program:")?;
+            writeln!(f, "    path: {program}")?;
+            writeln!(f, "    upload: {}", if self.upload { "enabled" } else { "disabled" })?;
         } else {
             writeln!(f, "  Program: <disabled>")?;
         }
@@ -109,7 +111,14 @@ async fn main() -> Result<()> {
 
     let mut tasks = vec![];
 
-    let result = spawn_tasks(&mut tasks, &args, program, &sender, cancellation_token.clone()).await;
+    let result = spawn_tasks(
+        &mut tasks,
+        &args,
+        program,
+        &sender,
+        cancellation_token.clone(),
+    )
+    .await;
 
     if let Ok(()) = result {
         select! {

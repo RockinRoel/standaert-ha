@@ -1,22 +1,22 @@
-use std::collections::HashMap;
-use serde::Deserialize;
 use crate::shal::common::{Edge, IsWas, Value};
+use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct SourceLoc(pub usize, pub usize);
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-pub(super) struct IODeclarations {
+pub struct IODeclarations {
     #[serde(default)]
-    pub(super) inputs: HashMap<String, IODeclaration>,
+    pub inputs: HashMap<String, IODeclaration>,
     #[serde(default)]
-    pub(super) outputs: HashMap<String, IODeclaration>,
+    pub outputs: HashMap<String, IODeclaration>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-pub(super) struct IODeclaration {
-    pub(super) pin: u8,
-    pub(super) name: Option<String>,
+pub struct IODeclaration {
+    pub pin: u8,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

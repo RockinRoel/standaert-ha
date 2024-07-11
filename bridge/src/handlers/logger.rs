@@ -1,8 +1,8 @@
 use crate::handlers::message::Message;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
+use tokio::sync::broadcast::Receiver;
 use tokio::task::JoinHandle;
 use tokio::{select, spawn};
-use tokio::sync::broadcast::Receiver;
 use tokio_util::sync::CancellationToken;
 
 struct Logger {
@@ -10,10 +10,7 @@ struct Logger {
     cancellation_token: CancellationToken,
 }
 
-pub fn start(
-    rx: Receiver<Message>,
-    cancellation_token: CancellationToken,
-) -> JoinHandle<()> {
+pub fn start(rx: Receiver<Message>, cancellation_token: CancellationToken) -> JoinHandle<()> {
     let mut logger = Logger {
         rx,
         cancellation_token,

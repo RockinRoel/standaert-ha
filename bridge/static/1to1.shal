@@ -1,13 +1,13 @@
 inputs: {
     in1: {
         pin: 0
-        name: Input 1
+        name: Button 1
     }
 }
 outputs: {
     out1: {
         pin: 31
-        name: Output 1
+        name: Light 1
     }
 }
 ---

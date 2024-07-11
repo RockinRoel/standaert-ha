@@ -271,7 +271,7 @@ impl Instruction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
-    pub(super) declarations: IODeclarations,
+    pub declarations: IODeclarations,
     pub(super) instructions: Vec<Instruction>,
     pub(super) source_locations: Vec<SourceLoc>,
 }

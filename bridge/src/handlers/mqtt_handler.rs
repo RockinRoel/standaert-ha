@@ -3,6 +3,7 @@ use crate::controller::event::Event;
 use crate::controller::message::MessageBody;
 use crate::handlers::message::Message;
 use crate::handlers::message::Message::ReceivedFromController;
+use crate::shal::bytecode::Program;
 use if_chain::if_chain;
 use rumqttc::{AsyncClient, EventLoop, Incoming, MqttOptions, OptionError, QoS};
 use serde::{Deserialize, Serialize};
@@ -12,22 +13,25 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
-use crate::shal::bytecode::Program;
+
+#[derive(Clone)]
+struct MqttHandlerOptions {
+    prefix: String,
+    program: Option<Program>,
+    cancellation_token: CancellationToken,
+    options: MqttOptions,
+}
 
 struct MqttHandlerClientTask {
+    options: MqttHandlerOptions,
     client: AsyncClient,
     rx: Receiver<Message>,
-    options: MqttOptions,
-    prefix: String,
-    cancellation_token: CancellationToken,
 }
 
 struct MqttHandlerEventLoopTask {
+    options: MqttHandlerOptions,
     event_loop: EventLoop,
     tx: Sender<Message>,
-    options: MqttOptions,
-    prefix: String,
-    cancellation_token: CancellationToken,
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -36,11 +40,39 @@ pub enum MqttHandlerError {
     OptionError(#[from] OptionError),
 }
 
+impl MqttHandlerOptions {
+    fn input_name(&self, pin: u8) -> String {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some(declaration) = program.declarations.inputs.values().find(|&declaration| declaration.pin == pin);
+            if let Some(name) = &declaration.name;
+            then {
+                name.clone()
+            } else {
+                format!("Input {pin}")
+            }
+        )
+    }
+
+    fn output_name(&self, pin: u8) -> String {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some(declaration) = program.declarations.outputs.values().find(|&declaration| declaration.pin == pin);
+            if let Some(name) = &declaration.name;
+            then {
+                name.clone()
+            } else {
+                format!("Output {pin}")
+            }
+        )
+    }
+}
+
 pub async fn start(
     url: String,
     credentials: Option<(String, String)>,
     prefix: String,
-    _program: Option<Program>,
+    program: Option<Program>,
     tx: Sender<Message>,
     cancellation_token: CancellationToken,
 ) -> Result<JoinHandle<()>, MqttHandlerError> {
@@ -48,20 +80,22 @@ pub async fn start(
     if let Some(credentials) = credentials {
         options.set_credentials(credentials.0, credentials.1);
     }
-    let (client, event_loop) = AsyncClient::new(options.clone(), 10);
+    let handler_options = MqttHandlerOptions {
+        prefix,
+        program,
+        cancellation_token,
+        options,
+    };
+    let (client, event_loop) = AsyncClient::new(handler_options.options.clone(), 10);
     let mut client_task = MqttHandlerClientTask {
+        options: handler_options.clone(),
         client: client.clone(),
         rx: tx.subscribe(),
-        options: options.clone(),
-        prefix: prefix.clone(),
-        cancellation_token: cancellation_token.clone(),
     };
     let mut event_loop_task = MqttHandlerEventLoopTask {
+        options: handler_options,
         event_loop,
         tx,
-        options: options.clone(),
-        prefix: prefix.clone(),
-        cancellation_token,
     };
     // TODO(Roel): announce and subscribe here!!!
     let client_task = tokio::spawn(async move {
@@ -90,7 +124,7 @@ impl MqttHandlerClientTask {
                         Err(_) => break,
                     }
                 },
-                _ = self.cancellation_token.cancelled() => break,
+                _ = self.options.cancellation_token.cancelled() => break,
             }
         }
     }
@@ -100,8 +134,8 @@ impl MqttHandlerClientTask {
             for i in 0..32 {
                 let state_topic = format!(
                     "{}/light/{}/{}/status",
-                    self.prefix,
-                    self.options.client_id(),
+                    self.options.prefix,
+                    self.options.options.client_id(),
                     i
                 );
                 self.client
@@ -125,8 +159,8 @@ impl MqttHandlerClientTask {
                 };
                 let state_topic = format!(
                     "{}/binary_sensor/{}/{}/pressed",
-                    self.prefix,
-                    self.options.client_id(),
+                    self.options.prefix,
+                    self.options.options.client_id(),
                     i
                 );
                 self.client
@@ -141,15 +175,15 @@ impl MqttHandlerClientTask {
         for i in 0..32 {
             let prefix = format!(
                 "{}/binary_sensor/{}/{}",
-                self.prefix,
-                self.options.client_id(),
+                self.options.prefix,
+                self.options.options.client_id(),
                 i
             );
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/pressed", prefix);
             let spec = BinarySensorSpec {
-                unique_id: format!("{}_input_{}", self.options.client_id(), i),
-                name: format!("Standaert Home Automation button #{}", i),
+                unique_id: format!("{}_input_{}", self.options.options.client_id(), i),
+                name: self.options.input_name(i),
                 icon: "mdi:light-switch-off".to_string(),
                 state_topic: state_topic.clone(),
             };
@@ -169,13 +203,18 @@ impl MqttHandlerClientTask {
         }
         // Announce lights
         for i in 0..32 {
-            let prefix = format!("{}/light/{}/{}", self.prefix, self.options.client_id(), i);
+            let prefix = format!(
+                "{}/light/{}/{}",
+                self.options.prefix,
+                self.options.options.client_id(),
+                i
+            );
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/status", prefix);
             let command_topic = format!("{}/switch", prefix);
             let spec = LightSpec {
-                unique_id: format!("{}_output_{}", self.options.client_id(), i),
-                name: format!("Standaert Home Automation light #{}", i),
+                unique_id: format!("{}_output_{}", self.options.options.client_id(), i),
+                name: self.options.output_name(i),
                 state_topic: state_topic.clone(),
                 command_topic: command_topic.clone(),
             };
@@ -198,8 +237,8 @@ impl MqttHandlerClientTask {
     async fn subscribe(&mut self) {
         let topic = format!(
             "{}/light/{}/+/switch",
-            self.prefix,
-            self.options.client_id()
+            self.options.prefix,
+            self.options.options.client_id()
         );
         self.client
             .subscribe(topic, QoS::AtLeastOnce)
@@ -231,7 +270,7 @@ impl MqttHandlerEventLoopTask {
                 notification = self.event_loop.poll() => {
                     match notification {
                         Ok(event) => {
-                            let prefix = format!("{}/light/{}/", self.prefix, self.options.client_id());
+                            let prefix = format!("{}/light/{}/", self.options.prefix, self.options.options.client_id());
                             if_chain!(
                                 if let rumqttc::Event::Incoming(incoming) = event;
                                 if let Incoming::Publish(publish) = incoming;
@@ -261,7 +300,7 @@ impl MqttHandlerEventLoopTask {
                         }
                     }
                 },
-                _ = self.cancellation_token.cancelled() => break,
+                _ = self.options.cancellation_token.cancelled() => break,
             }
         }
     }
