@@ -215,6 +215,7 @@ mod tests {
     #[test]
     fn test_interpret() {
         let program = Program {
+            declarations: Default::default(),
             instructions: vec![
                 On {
                     input: 0,

@@ -1,5 +1,5 @@
 use crate::controller::program_header::ProgramHeader;
-use crate::shal::ast::SourceLoc;
+use crate::shal::ast::{IODeclarations, SourceLoc};
 use crate::shal::common::{Edge, IsWas, Value};
 use crc::{Crc, CRC_16_XMODEM};
 use static_assertions::const_assert_eq;
@@ -271,6 +271,7 @@ impl Instruction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
+    pub(super) declarations: IODeclarations,
     pub(super) instructions: Vec<Instruction>,
     pub(super) source_locations: Vec<SourceLoc>,
 }
@@ -397,6 +398,7 @@ impl TryFrom<&[u8]> for Program {
             }
         }
         Ok(Program {
+            declarations: IODeclarations::default(),
             instructions,
             source_locations: vec![],
         })
@@ -438,6 +440,7 @@ impl From<&Program> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use crate::shal::ast::IODeclarations;
     use crate::shal::bytecode::Instruction::{End, If, Not, On, Or, Pop, Set, Toggle};
     use crate::shal::bytecode::{
         Edge, InOut, IsWas, Program, ProgramSizeError, StackLimitError, Value,
@@ -446,6 +449,7 @@ mod tests {
     #[test]
     fn test_program() {
         let program = Program {
+            declarations: IODeclarations::default(),
             instructions: vec![
                 On {
                     input: 0,

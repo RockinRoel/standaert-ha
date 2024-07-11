@@ -1,26 +1,34 @@
+use std::collections::HashMap;
+use serde::Deserialize;
 use crate::shal::common::{Edge, IsWas, Value};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct SourceLoc(pub usize, pub usize);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub(super) struct IODeclarations {
+    #[serde(default)]
+    pub(super) inputs: HashMap<String, IODeclaration>,
+    #[serde(default)]
+    pub(super) outputs: HashMap<String, IODeclaration>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub(super) struct IODeclaration {
+    pub(super) pin: u8,
+    pub(super) name: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Program {
-    pub(super) declarations: Vec<Declaration>,
+    pub(super) declarations: IODeclarations,
     pub(super) statements: Vec<Statement>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum Declaration {
-    Input {
-        entity_id: String,
-        number: u8,
-        source_loc: Option<SourceLoc>,
-    },
-    Output {
-        entity_id: String,
-        number: u8,
-        source_loc: Option<SourceLoc>,
-    },
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum DeclarationType {
+    Input,
+    Output,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

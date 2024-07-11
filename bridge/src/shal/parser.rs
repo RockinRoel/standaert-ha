@@ -1,47 +1,53 @@
-use crate::shal::ast::{
-    Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement,
-};
+use crate::shal::ast::{Action, Condition, Input, Output, Program, Statement};
 use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 use thiserror::Error;
+use regex::RegexBuilder;
 
 #[derive(Parser)]
 #[grammar = "shal/shal.pest"]
 struct ShalParser;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("Failed to parse input")]
-    PestParseError(#[from] pest::error::Error<Rule>),
+    #[error("Failed to parse entity declarations")]
+    EntityParseError(#[from] deser_hjson::Error),
+    #[error("Failed to parse program")]
+    PestParseError(#[from] Box<pest::error::Error<Rule>>),
 }
 
 pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
-    let pest_program = ShalParser::parse(Rule::program, input)?.next();
+    let mut program = Program::default();
 
-    let mut program = Program {
-        declarations: vec![],
-        statements: vec![],
-    };
+    let separator = RegexBuilder::new(r"^---\s*$").multi_line(true).build().unwrap_or_else(|_| unreachable!());
+    let splits: Vec<&str> = separator.splitn(input, 2).collect();
+    if splits.len() == 2 {
+        let first_split = *splits.first().unwrap_or_else(|| unreachable!());
+        let declarations = deser_hjson::from_str(first_split)?;
+        program.declarations = declarations;
+    }
+
+    if splits.is_empty() {
+        return Ok(program);
+    }
+
+    let last_split = *splits.last().unwrap_or_else(|| unreachable!());
+    let pest_program = ShalParser::parse(Rule::program, last_split).map_err(Box::new)?.next();
 
     let pest_program = pest_program.unwrap_or_else(|| unreachable!());
 
     for pair in pest_program.into_inner() {
-        match pair.as_rule() {
-            Rule::entity_declaration => {
-                program.declarations.push(handle_entity_declaration(pair));
-            }
-            Rule::top_level_statement => {
-                program.statements.push(handle_statement(pair));
-            }
-            _ => {}
+        if Rule::top_level_statement == pair.as_rule() {
+            program.statements.push(handle_statement(pair));
         }
     }
 
     Ok(program)
 }
 
+/*
 fn handle_entity_declaration(pair: Pair<Rule>) -> Declaration {
     let declaration = pair.into_inner().next().unwrap();
     match declaration.as_rule() {
@@ -76,6 +82,7 @@ fn handle_output_declaration(pair: Pair<Rule>) -> Declaration {
         source_loc: Some(SourceLoc(line, col)),
     }
 }
+*/
 
 fn handle_statement(pair: Pair<Rule>) -> Statement {
     let statement = pair.into_inner().next().unwrap();
@@ -322,9 +329,8 @@ fn handle_edge(pair: Pair<Rule>) -> Edge {
 
 #[cfg(test)]
 mod tests {
-    use crate::shal::ast::{
-        Action, Condition, Declaration, Input, Output, Program, SourceLoc, Statement,
-    };
+    use std::collections::HashMap;
+    use crate::shal::ast::{Action, Condition, Input, IODeclaration, IODeclarations, Output, Program, Statement};
     use crate::shal::common;
     use crate::shal::common::{IsWas, Value};
     use crate::shal::parser::parse;
@@ -332,78 +338,80 @@ mod tests {
     #[test]
     fn test_parse() {
         assert_eq!(
-            &parse("entity button = input 12;"),
-            &Ok(Program {
-                declarations: vec![Declaration::Input {
-                    entity_id: "button".to_string(),
-                    number: 12,
-                    source_loc: Some(SourceLoc(1, 1)),
-                }],
+            &parse("{inputs: {button: {pin: 12}}}\n---\n").unwrap(),
+            &Program {
+                declarations: IODeclarations {
+                    inputs: HashMap::from([
+                        ("button".to_owned(), IODeclaration { pin: 12, name: None }),
+                    ]),
+                    outputs: Default::default(),
+                },
                 statements: vec![],
-            })
+            }
         );
         assert_eq!(
-            &parse("entity light = output 5;"),
-            &Ok(Program {
-                declarations: vec![Declaration::Output {
-                    entity_id: "light".to_string(),
-                    number: 5,
-                    source_loc: Some(SourceLoc(1, 1)),
-                }],
+            &parse("{outputs: {light: {pin: 12}}}\n---\n").unwrap(),
+            &Program {
+                declarations: IODeclarations {
+                    inputs: Default::default(),
+                    outputs: HashMap::from([
+                        ("light".to_owned(), IODeclaration { pin: 12, name: None }),
+                    ]),
+                },
                 statements: vec![],
-            })
+            }
         );
         assert_eq!(
-            &parse("toggle output 1;"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("toggle output 1;").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Toggle(Output::Number(1)),)],
-            })
+            }
         );
         assert_eq!(
-            &parse("toggle light_downstairs;"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("toggle light_downstairs;").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Toggle(Output::Entity(
                     "light_downstairs".to_string()
                 )))],
-            })
+            }
         );
         assert_eq!(
-            &parse("set output 3 high;"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("set output 3 high;").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Set(
                     Output::Number(3),
                     Value::High
                 ))],
-            })
+            }
         );
         assert_eq!(
-            &parse("set light_upstairs low;"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("set light_upstairs low;").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Set(
                     Output::Entity("light_upstairs".to_string()),
                     Value::Low
                 ))],
-            })
+            }
         );
         assert_eq!(
-            &parse("on redge input 3 toggle output 4;"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("on redge input 3 toggle output 4;").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Event {
                     edge: common::Edge::Rising,
                     input: Input::Number(3),
                     statements: vec![Statement::Action(Action::Toggle(Output::Number(4))),],
                 },]
-            })
+            }
         );
         assert_eq!(
-            &parse("on fedge input 5 { toggle output 4; set output 6 high; }"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("on fedge input 5 { toggle output 4; set output 6 high; }").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::Event {
                     edge: common::Edge::Falling,
                     input: Input::Number(5),
@@ -412,12 +420,12 @@ mod tests {
                         Statement::Action(Action::Set(Output::Number(6), Value::High,)),
                     ],
                 },]
-            })
+            }
         );
         assert_eq!(
-            &parse("if input 4 is low xor light_upstairs was high {} else { toggle output 4; }"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("if input 4 is low xor light_upstairs was high {} else { toggle output 4; }").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Xor(
                         Box::new(Condition::Input(Input::Number(4), IsWas::Is, Value::Low)),
@@ -430,12 +438,12 @@ mod tests {
                     vec![],
                     vec![Statement::Action(Action::Toggle(Output::Number(4))),],
                 )],
-            })
+            }
         );
         assert_eq!(
-            &parse("if output 5 is high or output 20 is high {}"),
-            &Ok(Program {
-                declarations: vec![],
+            &parse("if output 5 is high or output 20 is high {}").unwrap(),
+            &Program {
+                declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Or(
                         Box::new(Condition::Output(Output::Number(5), IsWas::Is, Value::High)),
@@ -448,7 +456,7 @@ mod tests {
                     vec![],
                     vec![],
                 )],
-            })
+            }
         );
         let parse_result = parse(include_str!("../../static/standaertha.shal"));
         assert!(matches!(&parse_result, &Ok(Program { .. })));

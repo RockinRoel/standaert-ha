@@ -1,17 +1,4 @@
-program = { SOI ~ entity_declaration* ~ top_level_statement* ~ EOI }
-
-entity_declaration = {
-    input_declaration ~ ";"
-  | output_declaration ~ ";"
-}
-
-input_declaration = {
-    kw_entity ~ entity_id ~ "=" ~ input
-}
-
-output_declaration = {
-    kw_entity ~ entity_id ~ "=" ~ output
-}
+program = { SOI ~ top_level_statement* ~ EOI }
 
 top_level_statement = {
     action ~ ";"

@@ -247,6 +247,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deser-hjson"
+version = "2.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d94aac4095c08ded7e4b9ba7fc2b2929f11b94bb96897ca188b0f64e01688e1"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -913,10 +922,12 @@ dependencies = [
  "anyhow",
  "clap",
  "crc",
+ "deser-hjson",
  "futures",
  "if_chain",
  "pest",
  "pest_derive",
+ "regex",
  "rumqttc",
  "serde",
  "serde_json",

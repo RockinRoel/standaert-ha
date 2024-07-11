@@ -1,16 +1,9 @@
-use crate::shal::ast::SourceLoc;
+use crate::shal::ast::{IODeclaration, IODeclarations};
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
-use crate::shal::compiler::CompileError::{DuplicateEntityError, UnknownEntityError};
-use crate::shal::compiler::InOut::{Input, Output};
+use crate::shal::compiler::CompileError::{UnknownEntityError};
 use crate::shal::{ast, bytecode};
-use std::collections::HashMap;
 use thiserror::Error;
-
-enum InOut {
-    Input(u8),
-    Output(u8),
-}
 
 fn loc_to_string(source_loc: &Option<ast::SourceLoc>) -> String {
     if let Some(ast::SourceLoc(line, col)) = source_loc {
@@ -40,14 +33,12 @@ pub enum CompileError {
     },
 }
 
-type Entities = HashMap<String, (InOut, Option<SourceLoc>)>;
-
-fn retrieve_input(entities: &Entities, input: &ast::Input) -> Result<u8, CompileError> {
+fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<u8, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
-            if let Some((Input(number), _)) = entities.get(entity_id) {
-                Ok(*number)
+            if let Some(IODeclaration { pin, .. }) = declarations.inputs.get(entity_id) {
+                Ok(*pin)
             } else {
                 Err(UnknownEntityError {
                     name: entity_id.clone(),
@@ -58,12 +49,12 @@ fn retrieve_input(entities: &Entities, input: &ast::Input) -> Result<u8, Compile
     }
 }
 
-fn retrieve_output(entities: &Entities, output: &ast::Output) -> Result<u8, CompileError> {
+fn retrieve_output(declarations: &IODeclarations, output: &ast::Output) -> Result<u8, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
-            if let Some((Output(number), _)) = entities.get(entity_id) {
-                Ok(*number)
+            if let Some(IODeclaration { pin, .. }) = declarations.outputs.get(entity_id) {
+                Ok(*pin)
             } else {
                 Err(UnknownEntityError {
                     name: entity_id.clone(),
@@ -74,67 +65,23 @@ fn retrieve_output(entities: &Entities, output: &ast::Output) -> Result<u8, Comp
     }
 }
 
-fn retrieve_entity(
-    entities: &Entities,
-    entity: &str,
-) -> Result<(u8, bytecode::InOut), CompileError> {
-    match entities.get(entity) {
-        Some((Input(number), _)) => Ok((*number, bytecode::InOut::Input)),
-        Some((Output(number), _)) => Ok((*number, bytecode::InOut::Output)),
-        _ => Err(UnknownEntityError {
-            name: entity.to_string(),
-            location: None,
-        }),
-    }
-}
-
-fn collect_entities(declarations: &[ast::Declaration]) -> Result<Entities, CompileError> {
-    let mut result = HashMap::new();
-    for declaration in declarations.iter() {
-        match declaration {
-            ast::Declaration::Input {
-                entity_id,
-                number,
-                source_loc,
-            } => {
-                if let Some((_, first_loc)) = result.get(entity_id) {
-                    return Err(DuplicateEntityError {
-                        name: entity_id.clone(),
-                        first_loc: *first_loc,
-                        second_loc: *source_loc,
-                    });
-                } else {
-                    result.insert(entity_id.clone(), (Input(*number), *source_loc));
-                }
-            }
-            ast::Declaration::Output {
-                entity_id,
-                number,
-                source_loc,
-            } => {
-                if let Some((_, first_loc)) = result.get(entity_id) {
-                    return Err(DuplicateEntityError {
-                        name: entity_id.clone(),
-                        first_loc: *first_loc,
-                        second_loc: *source_loc,
-                    });
-                } else {
-                    result.insert(entity_id.clone(), (Output(*number), *source_loc));
-                }
-            }
-        }
-    }
-    Ok(result)
+fn retrieve_entity(declarations: &IODeclarations, entity_id: &str) -> Result<(u8, bytecode::InOut), CompileError> {
+    retrieve_input(declarations, &ast::Input::Entity(entity_id.to_string()))
+        .map(|i| (i, bytecode::InOut::Input))
+        .or_else(|_| {
+            retrieve_output(declarations, &ast::Output::Entity(entity_id.to_string()))
+                .map(|i| (i, bytecode::InOut::Output))
+        })
 }
 
 pub(crate) fn compile(ast_program: &ast::Program) -> Result<bytecode::Program, CompileError> {
-    let entities = collect_entities(&ast_program.declarations)?;
     let mut bytecode_program = bytecode::Program {
+        declarations: ast_program.declarations.clone(),
         instructions: vec![],
         source_locations: vec![],
     };
     for statement in ast_program.statements.iter() {
-        handle_statement(&mut bytecode_program, &entities, statement);
+        handle_statement(&mut bytecode_program, statement);
     }
     bytecode_program.instructions.push(Instruction::End);
     Ok(bytecode_program)
@@ -142,34 +89,33 @@ pub(crate) fn compile(ast_program: &ast::Program) -> Result<bytecode::Program, C
 
 fn handle_statement(
     program: &mut bytecode::Program,
-    entities: &Entities,
     statement: &ast::Statement,
 ) {
     match statement {
-        ast::Statement::Action(action) => handle_action(program, entities, action),
+        ast::Statement::Action(action) => handle_action(program, action),
         ast::Statement::IfElse(condition, if_block, else_block) => {
-            handle_if_else(program, entities, condition, if_block, else_block);
+            handle_if_else(program, condition, if_block, else_block);
         }
         ast::Statement::Event {
             edge,
             input,
             statements,
         } => {
-            handle_event(program, entities, edge, input, statements);
+            handle_event(program, edge, input, statements);
         }
     }
 }
 
-fn handle_action(program: &mut bytecode::Program, entities: &Entities, action: &ast::Action) {
+fn handle_action(program: &mut bytecode::Program, action: &ast::Action) {
     match action {
         ast::Action::Toggle(output) => {
-            let number = retrieve_output(entities, output).unwrap();
+            let number = retrieve_output(&program.declarations, output).unwrap();
             program
                 .instructions
                 .push(Instruction::Toggle { output: number });
         }
         ast::Action::Set(output, value) => {
-            let number = retrieve_output(entities, output).unwrap();
+            let number = retrieve_output(&program.declarations, output).unwrap();
             program.instructions.push(Instruction::Set {
                 output: number,
                 value: *value,
@@ -180,19 +126,18 @@ fn handle_action(program: &mut bytecode::Program, entities: &Entities, action: &
 
 fn handle_if_else(
     program: &mut bytecode::Program,
-    entities: &Entities,
     condition: &ast::Condition,
     if_block: &[ast::Statement],
     else_block: &[ast::Statement],
 ) {
-    handle_condition(program, entities, condition);
+    handle_condition(program, condition);
     for statement in if_block.iter() {
-        handle_statement(program, entities, statement);
+        handle_statement(program, statement);
     }
     if !else_block.is_empty() {
         program.instructions.push(Instruction::Not);
         for statement in else_block.iter() {
-            handle_statement(program, entities, statement);
+            handle_statement(program, statement);
         }
     }
     program.instructions.push(Instruction::Pop);
@@ -200,31 +145,30 @@ fn handle_if_else(
 
 fn handle_condition(
     program: &mut bytecode::Program,
-    entities: &Entities,
     condition: &ast::Condition,
 ) {
     match condition {
         ast::Condition::And(l, r) => {
-            handle_condition(program, entities, l.as_ref());
-            handle_condition(program, entities, r.as_ref());
+            handle_condition(program, l.as_ref());
+            handle_condition(program, r.as_ref());
             program.instructions.push(Instruction::And);
         }
         ast::Condition::Or(l, r) => {
-            handle_condition(program, entities, l.as_ref());
-            handle_condition(program, entities, r.as_ref());
+            handle_condition(program, l.as_ref());
+            handle_condition(program, r.as_ref());
             program.instructions.push(Instruction::Or);
         }
         ast::Condition::Xor(l, r) => {
-            handle_condition(program, entities, l.as_ref());
-            handle_condition(program, entities, r.as_ref());
+            handle_condition(program, l.as_ref());
+            handle_condition(program, r.as_ref());
             program.instructions.push(Instruction::Xor);
         }
         ast::Condition::Not(c) => {
-            handle_condition(program, entities, c.as_ref());
+            handle_condition(program, c.as_ref());
             program.instructions.push(Instruction::Not);
         }
         ast::Condition::Input(input, is_was, value) => {
-            let number = retrieve_input(entities, input).unwrap();
+            let number = retrieve_input(&program.declarations, input).unwrap();
             program.instructions.push(Instruction::If {
                 number,
                 is_was: *is_was,
@@ -233,7 +177,7 @@ fn handle_condition(
             });
         }
         ast::Condition::Output(output, is_was, value) => {
-            let number = retrieve_output(entities, output).unwrap();
+            let number = retrieve_output(&program.declarations, output).unwrap();
             program.instructions.push(Instruction::If {
                 number,
                 is_was: *is_was,
@@ -242,7 +186,7 @@ fn handle_condition(
             });
         }
         ast::Condition::Entity(entity, is_was, value) => {
-            let (number, in_out) = retrieve_entity(entities, entity).unwrap();
+            let (number, in_out) = retrieve_entity(&program.declarations, entity).unwrap();
             program.instructions.push(Instruction::If {
                 number,
                 is_was: *is_was,
@@ -255,25 +199,26 @@ fn handle_condition(
 
 fn handle_event(
     program: &mut bytecode::Program,
-    entities: &Entities,
     edge: &common::Edge,
     input: &ast::Input,
     statements: &[ast::Statement],
 ) {
-    let number = retrieve_input(entities, input).unwrap();
+    let number = retrieve_input(&program.declarations, input).unwrap();
     program.instructions.push(Instruction::On {
         input: number,
         edge: *edge,
     });
     for statement in statements.iter() {
-        handle_statement(program, entities, statement);
+        handle_statement(program, statement);
     }
     program.instructions.push(Instruction::Pop);
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use crate::shal::ast;
+    use crate::shal::ast::{IODeclaration, IODeclarations};
     use crate::shal::bytecode;
     use crate::shal::bytecode::Instruction;
     use crate::shal::common::{Edge, IsWas, Value};
@@ -282,33 +227,17 @@ mod tests {
     #[test]
     fn test_compile() {
         let ast_program = ast::Program {
-            declarations: vec![
-                ast::Declaration::Input {
-                    entity_id: "button_downstairs".to_string(),
-                    number: 0,
-                    source_loc: None,
-                },
-                ast::Declaration::Input {
-                    entity_id: "button_upstairs".to_string(),
-                    number: 1,
-                    source_loc: None,
-                },
-                ast::Declaration::Output {
-                    entity_id: "light_downstairs".to_string(),
-                    number: 0,
-                    source_loc: None,
-                },
-                ast::Declaration::Output {
-                    entity_id: "light_upstairs".to_string(),
-                    number: 1,
-                    source_loc: None,
-                },
-                ast::Declaration::Output {
-                    entity_id: "light_stairs".to_string(),
-                    number: 2,
-                    source_loc: None,
-                },
-            ],
+            declarations: IODeclarations {
+                inputs: HashMap::from([
+                    ("button_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
+                    ("button_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                ]),
+                outputs: HashMap::from([
+                    ("light_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
+                    ("light_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                    ("light_stairs".to_owned(), IODeclaration { pin: 2, name: None }),
+                ]),
+            },
             statements: vec![
                 ast::Statement::Event {
                     edge: Edge::Rising,
@@ -352,6 +281,17 @@ mod tests {
 
         assert_eq!(
             &Ok(bytecode::Program {
+                declarations: IODeclarations {
+                    inputs: HashMap::from([
+                        ("button_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
+                        ("button_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                    ]),
+                    outputs: HashMap::from([
+                        ("light_downstairs".to_owned(), IODeclaration { pin: 0, name: None }),
+                        ("light_upstairs".to_owned(), IODeclaration { pin: 1, name: None }),
+                        ("light_stairs".to_owned(), IODeclaration { pin: 2, name: None }),
+                    ]),
+                },
                 instructions: vec![
                     Instruction::On {
                         input: 0,

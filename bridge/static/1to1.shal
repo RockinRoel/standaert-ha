@@ -1,3 +1,16 @@
+inputs: {
+    in1: {
+        pin: 0
+        name: Input 1
+    }
+}
+outputs: {
+    out1: {
+        pin: 31
+        name: Output 1
+    }
+}
+---
 on fedge input 0 toggle output 31;
 on fedge input 1 toggle output 30;
 on fedge input 2 toggle output 29;
