@@ -1,14 +1,16 @@
-inputs: {
-    button_bedroom: {
-        pin: 0
-        name: Bedroom
-    }
-}
-outputs: {
-    light_bedroom: {
-        pin: 0
-        name: Bedroom
-    }
+{
+  inputs: {
+      button_bedroom: {
+          pin: 0
+          name: Bedroom
+      }
+  }
+  outputs: {
+      light_bedroom: {
+          pin: 0
+          name: Bedroom
+      }
+  }
 }
 ---
 on redge button_bedroom toggle light_bedroom;

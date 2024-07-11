@@ -59,9 +59,9 @@ impl MqttHandlerOptions {
             if let Some(program) = &self.program;
             if let Some((id, _)) = program.declarations.inputs.iter().find(|(_, declaration)| declaration.pin == pin);
             then {
-                id.clone()
+                id.clone().into()
             } else {
-                format!("in{pin}")
+                pin.to_string()
             }
         )
     }
@@ -90,9 +90,9 @@ impl MqttHandlerOptions {
             if let Some(program) = &self.program;
             if let Some((id, _)) = program.declarations.outputs.iter().find(|(_, declaration)| declaration.pin == pin);
             then {
-                id.clone()
+                id.clone().into()
             } else {
-                format!("out{pin}")
+                pin.to_string()
             }
         )
     }

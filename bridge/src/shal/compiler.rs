@@ -1,4 +1,4 @@
-use crate::shal::ast::{IODeclaration, IODeclarations};
+use crate::shal::ast::{EntityID, IODeclaration, IODeclarations};
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
 use crate::shal::compiler::CompileError::UnknownEntityError;
@@ -28,7 +28,7 @@ pub enum CompileError {
     },
     #[error("Unknown entity: {0} at {1}", name, loc_to_string(location))]
     UnknownEntityError {
-        name: String,
+        name: EntityID,
         location: Option<ast::SourceLoc>,
     },
 }
@@ -70,12 +70,12 @@ fn retrieve_output(
 
 fn retrieve_entity(
     declarations: &IODeclarations,
-    entity_id: &str,
+    entity_id: &EntityID,
 ) -> Result<(u8, bytecode::InOut), CompileError> {
-    retrieve_input(declarations, &ast::Input::Entity(entity_id.to_string()))
+    retrieve_input(declarations, &ast::Input::Entity(entity_id.clone()))
         .map(|i| (i, bytecode::InOut::Input))
         .or_else(|_| {
-            retrieve_output(declarations, &ast::Output::Entity(entity_id.to_string()))
+            retrieve_output(declarations, &ast::Output::Entity(entity_id.clone()))
                 .map(|i| (i, bytecode::InOut::Output))
         })
 }
@@ -230,25 +230,25 @@ mod tests {
             declarations: IODeclarations {
                 inputs: HashMap::from([
                     (
-                        "button_downstairs".to_owned(),
+                        "button_downstairs".try_into().unwrap(),
                         IODeclaration { pin: 0, name: None },
                     ),
                     (
-                        "button_upstairs".to_owned(),
+                        "button_upstairs".try_into().unwrap(),
                         IODeclaration { pin: 1, name: None },
                     ),
                 ]),
                 outputs: HashMap::from([
                     (
-                        "light_downstairs".to_owned(),
+                        "light_downstairs".try_into().unwrap(),
                         IODeclaration { pin: 0, name: None },
                     ),
                     (
-                        "light_upstairs".to_owned(),
+                        "light_upstairs".try_into().unwrap(),
                         IODeclaration { pin: 1, name: None },
                     ),
                     (
-                        "light_stairs".to_owned(),
+                        "light_stairs".try_into().unwrap(),
                         IODeclaration { pin: 2, name: None },
                     ),
                 ]),
@@ -256,37 +256,37 @@ mod tests {
             statements: vec![
                 ast::Statement::Event {
                     edge: Edge::Rising,
-                    input: ast::Input::Entity("button_downstairs".to_string()),
+                    input: ast::Input::Entity("button_downstairs".try_into().unwrap()),
                     statements: vec![ast::Statement::Action(ast::Action::Toggle(
-                        ast::Output::Entity("light_downstairs".to_string()),
+                        ast::Output::Entity("light_downstairs".try_into().unwrap()),
                     ))],
                 },
                 ast::Statement::Event {
                     edge: Edge::Rising,
-                    input: ast::Input::Entity("button_upstairs".to_string()),
+                    input: ast::Input::Entity("button_upstairs".try_into().unwrap()),
                     statements: vec![ast::Statement::Action(ast::Action::Toggle(
-                        ast::Output::Entity("light_upstairs".to_string()),
+                        ast::Output::Entity("light_upstairs".try_into().unwrap()),
                     ))],
                 },
                 ast::Statement::IfElse(
                     ast::Condition::Or(
                         Box::new(ast::Condition::Output(
-                            ast::Output::Entity("light_downstairs".to_string()),
+                            ast::Output::Entity("light_downstairs".try_into().unwrap()),
                             IsWas::Is,
                             Value::High,
                         )),
                         Box::new(ast::Condition::Output(
-                            ast::Output::Entity("light_upstairs".to_string()),
+                            ast::Output::Entity("light_upstairs".try_into().unwrap()),
                             IsWas::Is,
                             Value::High,
                         )),
                     ),
                     vec![ast::Statement::Action(ast::Action::Set(
-                        ast::Output::Entity("light_stairs".to_string()),
+                        ast::Output::Entity("light_stairs".try_into().unwrap()),
                         Value::High,
                     ))],
                     vec![ast::Statement::Action(ast::Action::Set(
-                        ast::Output::Entity("light_stairs".to_string()),
+                        ast::Output::Entity("light_stairs".try_into().unwrap()),
                         Value::Low,
                     ))],
                 ),
@@ -299,25 +299,25 @@ mod tests {
                 declarations: IODeclarations {
                     inputs: HashMap::from([
                         (
-                            "button_downstairs".to_owned(),
+                            "button_downstairs".try_into().unwrap(),
                             IODeclaration { pin: 0, name: None }
                         ),
                         (
-                            "button_upstairs".to_owned(),
+                            "button_upstairs".try_into().unwrap(),
                             IODeclaration { pin: 1, name: None }
                         ),
                     ]),
                     outputs: HashMap::from([
                         (
-                            "light_downstairs".to_owned(),
+                            "light_downstairs".try_into().unwrap(),
                             IODeclaration { pin: 0, name: None }
                         ),
                         (
-                            "light_upstairs".to_owned(),
+                            "light_upstairs".try_into().unwrap(),
                             IODeclaration { pin: 1, name: None }
                         ),
                         (
-                            "light_stairs".to_owned(),
+                            "light_stairs".try_into().unwrap(),
                             IODeclaration { pin: 2, name: None }
                         ),
                     ]),

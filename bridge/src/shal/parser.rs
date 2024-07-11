@@ -1,4 +1,4 @@
-use crate::shal::ast::{Action, Condition, Input, Output, Program, Statement};
+use crate::shal::ast::{Action, Condition, EntityID, Input, Output, Program, Statement};
 use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -117,8 +117,8 @@ fn handle_number(pair: Pair<Rule>) -> u8 {
     }
 }
 
-fn handle_entity_id(pair: Pair<Rule>) -> String {
-    pair.as_str().to_string()
+fn handle_entity_id(pair: Pair<Rule>) -> EntityID {
+    pair.as_str().to_owned().try_into().unwrap() // TODO(Roel): What if this fails?
 }
 
 fn handle_value(pair: Pair<Rule>) -> Value {
@@ -312,7 +312,7 @@ mod tests {
             &Program {
                 declarations: IODeclarations {
                     inputs: HashMap::from([(
-                        "button".to_owned(),
+                        "button".try_into().unwrap(),
                         IODeclaration {
                             pin: 12,
                             name: None
@@ -329,7 +329,7 @@ mod tests {
                 declarations: IODeclarations {
                     inputs: Default::default(),
                     outputs: HashMap::from([(
-                        "light".to_owned(),
+                        "light".try_into().unwrap(),
                         IODeclaration {
                             pin: 12,
                             name: None
@@ -351,7 +351,7 @@ mod tests {
             &Program {
                 declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Toggle(Output::Entity(
-                    "light_downstairs".to_string()
+                    "light_downstairs".try_into().unwrap()
                 )))],
             }
         );
@@ -370,7 +370,7 @@ mod tests {
             &Program {
                 declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Set(
-                    Output::Entity("light_upstairs".to_string()),
+                    Output::Entity("light_upstairs".try_into().unwrap()),
                     Value::Low
                 ))],
             }
@@ -409,7 +409,7 @@ mod tests {
                     Condition::Xor(
                         Box::new(Condition::Input(Input::Number(4), IsWas::Is, Value::Low)),
                         Box::new(Condition::Entity(
-                            "light_upstairs".to_string(),
+                            "light_upstairs".try_into().unwrap(),
                             IsWas::Was,
                             Value::High
                         )),

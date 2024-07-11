@@ -1,14 +1,16 @@
-inputs: {
+{
+  inputs: {
     in1: {
-        pin: 0
-        name: Button 1
+      pin: 0
+      name: Button 1
     }
-}
-outputs: {
+  }
+  outputs: {
     out1: {
-        pin: 31
-        name: Light 1
+      pin: 31
+      name: Light 1
     }
+  }
 }
 ---
 on fedge input 0 toggle output 31;
