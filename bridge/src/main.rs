@@ -1,7 +1,9 @@
+mod args;
 pub mod controller;
 pub mod handlers;
 pub mod shal;
 
+use crate::args::Args;
 use crate::handlers::message::Message;
 use crate::handlers::{logger, mqtt_handler, programmer, refresher, serial_handler};
 use crate::shal::bytecode::Program;
@@ -9,91 +11,11 @@ use anyhow::Result;
 use clap::Parser;
 use futures::future::join_all;
 use if_chain::if_chain;
-use std::fmt::{Display, Formatter};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// MQTT broker host
-    #[arg(long, env = "SHA_MQTT_URL")]
-    mqtt_url: Option<String>,
-
-    /// MQTT broker user
-    #[arg(long, env = "SHA_MQTT_USER")]
-    mqtt_user: Option<String>,
-
-    /// MQTT broker password
-    #[arg(long, env = "SHA_MQTT_PASSWORD")]
-    mqtt_password: Option<String>,
-
-    /// Home assistant discovery prefix
-    #[arg(long, default_value = "homeassistant", env = "SHA_DISCOVERY_PREFIX")]
-    prefix: String,
-
-    /// Serial device
-    #[arg(long, env = "SHA_SERIAL_DEVICE")]
-    serial: Option<String>,
-
-    /// Program location
-    #[arg(long, env = "SHAL_PROGRAM")]
-    program: Option<String>,
-
-    /// Determines whether we actually upload the program
-    #[arg(long, default_value_t = false, env = "SHA_UPLOAD")]
-    upload: bool,
-
-    /// Verbose
-    #[arg(long, default_value_t = false, env = "SHA_DEBUG")]
-    debug: bool,
-}
-
-impl Display for Args {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(mqtt_url) = &self.mqtt_url {
-            writeln!(f, "  MQTT options:")?;
-            writeln!(f, "    URL: {}", mqtt_url)?;
-            if let Some(mqtt_user) = &self.mqtt_user {
-                writeln!(f, "    user: {}", mqtt_user)?;
-            } else {
-                writeln!(f, "    user: <none>")?;
-            }
-            writeln!(
-                f,
-                "    password: {}",
-                if self.mqtt_password.is_some() {
-                    "***"
-                } else {
-                    "<none>"
-                }
-            )?;
-            writeln!(f, "    prefix: {}", self.prefix)?;
-        } else {
-            writeln!(f, "  MQTT: disabled")?;
-        }
-        if let Some(serial) = &self.serial {
-            writeln!(f, "  Serial port: {}", serial)?;
-        } else {
-            writeln!(f, "  Serial: <disabled>")?;
-        }
-        if let Some(program) = &self.program {
-            writeln!(f, "  Program:")?;
-            writeln!(f, "    path: {program}")?;
-            writeln!(f, "    upload: {}", if self.upload { "enabled" } else { "disabled" })?;
-        } else {
-            writeln!(f, "  Program: <disabled>")?;
-        }
-        writeln!(
-            f,
-            "  Debug: {}",
-            if self.debug { "enabled" } else { "disabled" }
-        )
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
