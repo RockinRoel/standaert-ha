@@ -80,19 +80,36 @@ impl MqttHandler {
             join_set,
             event_loop_cancellation_token,
         };
-        let result = mqtt_handler.announce().await;
+        let result = mqtt_handler.announce_and_subscribe().await;
         if let Err(e) = result {
-            mqtt_handler.event_loop_cancellation_token.cancel();
-            let _ = mqtt_handler.join_set.join_next().await;
-            return Err(e.into());
-        }
-        let result = mqtt_handler.subscribe().await;
-        if let Err(e) = result {
-            mqtt_handler.event_loop_cancellation_token.cancel();
-            let _ = mqtt_handler.join_set.join_next().await;
+            let _ = mqtt_handler.cancel_and_join().await;
             return Err(e.into());
         }
         Ok(mqtt_handler)
+    }
+
+    async fn join(&mut self) -> Result<(), MqttHandlerError> {
+        match self.join_set.join_next().await {
+            Some(Ok(result)) => result,
+            Some(Err(e)) => {
+                if let Ok(panic) = e.try_into_panic() {
+                    panic::resume_unwind(panic);
+                } else {
+                    Ok(())
+                }
+            }
+            None => Ok(())
+        }
+    }
+
+    async fn cancel_and_join(mut self) -> Result<(), MqttHandlerError> {
+        self.event_loop_cancellation_token.cancel();
+        self.join().await
+    }
+
+    async fn announce_and_subscribe(&mut self) -> Result<(), ClientError> {
+        self.announce().await?;
+        self.subscribe().await
     }
 
     async fn announce(&mut self) -> Result<(), ClientError> {
@@ -199,16 +216,8 @@ impl MqttHandler {
                 },
             }
         }
-        self.event_loop_cancellation_token.cancel();
-        match self.join_set.join_next().await {
-            Some(Ok(result)) => error.map_or(result, Err),
-            Some(Err(e)) => if let Ok(panic) = e.try_into_panic() {
-                panic::resume_unwind(panic)
-            } else {
-                error.map_or(Ok(()), Err)
-            }
-            None => error.map_or(Ok(()), Err)
-        }
+        let result = self.cancel_and_join().await;
+        error.map_or(result, Err)
     }
 
     async fn handle_message_from_controller(
