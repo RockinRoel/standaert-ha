@@ -31,10 +31,6 @@ pub struct Args {
     /// Determines whether we actually upload the program
     #[arg(long, default_value_t = false, env = "SHA_UPLOAD")]
     pub upload: bool,
-
-    /// Verbose
-    #[arg(long, default_value_t = false, env = "SHA_DEBUG")]
-    pub debug: bool,
 }
 
 impl Display for Args {
@@ -72,14 +68,9 @@ impl Display for Args {
                 f,
                 "    upload: {}",
                 if self.upload { "enabled" } else { "disabled" }
-            )?;
+            )
         } else {
-            writeln!(f, "  Program: <disabled>")?;
+            writeln!(f, "  Program: <disabled>")
         }
-        writeln!(
-            f,
-            "  Debug: {}",
-            if self.debug { "enabled" } else { "disabled" }
-        )
     }
 }

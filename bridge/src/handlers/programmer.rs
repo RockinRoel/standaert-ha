@@ -7,14 +7,14 @@ use crate::handlers::programmer::HandleMessageResult::{Continue, Done};
 use crate::handlers::programmer::State::{AwaitingAck, Uploading};
 use crate::shal::bytecode::Program;
 use crate::shal::{bytecode, compiler, parser};
-use log::error;
+use log::{error, info, warn};
 use std::io;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio_graceful_shutdown::SubsystemHandle;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Copy, Clone)]
 enum State {
@@ -37,7 +37,7 @@ pub enum ProgrammerError {
 }
 
 struct Programmer {
-    subsys: SubsystemHandle,
+    cancellation_token: CancellationToken,
     tx: Sender<Message>,
     rx: Receiver<Message>,
     state: State,
@@ -61,10 +61,11 @@ pub async fn compile(program_path: &str) -> Result<Program, ProgrammerError> {
 }
 
 pub async fn run(
-    subsys: SubsystemHandle,
+    cancellation_token: CancellationToken,
     program: Program,
     sender: Sender<Message>,
 ) -> Result<(), anyhow::Error> {
+    info!("Starting programmer");
     sender
         .send(SendToController(ProgramStart {
             header: program.header(),
@@ -73,7 +74,7 @@ pub async fn run(
 
     let rx = sender.subscribe();
     let mut programmer = Programmer {
-        subsys,
+        cancellation_token,
         tx: sender,
         rx,
         state: AwaitingAck,
@@ -81,6 +82,9 @@ pub async fn run(
     };
 
     programmer.run().await;
+
+    info!("Programmer shut down");
+
     Ok(())
 }
 
@@ -88,7 +92,7 @@ impl Programmer {
     async fn run(&mut self) {
         loop {
             select! {
-                _ = self.subsys.on_shutdown_requested() => break,
+                _ = self.cancellation_token.cancelled() => break,
                 message = self.rx.recv() => if self.handle_message(&message) == Done {
                     break;
                 },
@@ -101,15 +105,19 @@ impl Programmer {
             Ok(ReceivedFromController(body)) => match (self.state, body) {
                 (AwaitingAck, ProgramStartAck { header }) => {
                     if *header == self.program.header() {
+                        info!("Program start ack received, starting upload");
                         self.upload();
                     } else {
+                        warn!("Program start ack does not match, retrying upload");
                         self.retry();
                     }
                 }
                 (Uploading, ProgramEndAck { header }) => {
                     if *header == self.program.header() {
+                        info!("Upload done");
                         return Done;
                     } else {
+                        warn!("Program end ack does not match, retrying upload");
                         self.retry();
                     }
                 }

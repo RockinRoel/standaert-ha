@@ -6,17 +6,17 @@ use std::time::Duration;
 use tokio::select;
 use tokio::sync::broadcast::Sender;
 use tokio::time::sleep;
-use tokio_graceful_shutdown::SubsystemHandle;
+use tokio_util::sync::CancellationToken;
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(10);
 
 struct Refresher {
-    subsys: SubsystemHandle,
+    cancellation_token: CancellationToken,
     tx: Sender<Message>,
 }
 
-pub async fn run(subsys: SubsystemHandle, tx: Sender<Message>) -> Result<(), anyhow::Error> {
-    let refresher = Refresher { subsys, tx };
+pub async fn run(cancellation_token: CancellationToken, tx: Sender<Message>) -> Result<(), anyhow::Error> {
+    let refresher = Refresher { cancellation_token, tx };
     refresher.run().await;
     Ok(())
 }
@@ -26,7 +26,7 @@ impl Refresher {
         self.send_refresh();
         loop {
             select! {
-                _ = self.subsys.on_shutdown_requested() => break,
+                _ = self.cancellation_token.cancelled() => break,
                 _ = sleep(REFRESH_INTERVAL) => self.send_refresh(),
             }
         }
