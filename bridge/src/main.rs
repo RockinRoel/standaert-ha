@@ -7,7 +7,7 @@ use crate::args::Args;
 use crate::handlers::message::Message;
 use crate::handlers::mqtt_handler::{MqttHandler, MqttHandlerConfig};
 use crate::handlers::serial_handler::SerialHandler;
-use crate::handlers::{logger, programmer, refresher};
+use crate::handlers::{ctrlc_handler, logger, programmer, refresher};
 use crate::shal::bytecode::Program;
 use anyhow::Result;
 use clap::Parser;
@@ -16,8 +16,6 @@ use log::Level::Trace;
 use log::{info, log_enabled};
 use std::collections::VecDeque;
 use std::panic;
-use tokio::select;
-use tokio::signal::ctrl_c;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinSet;
@@ -42,20 +40,6 @@ async fn main() -> Result<()> {
 
     let mut join_set: JoinSet<Result<()>> = JoinSet::new();
     let cancellation_token = CancellationToken::new();
-
-    {
-        let cancellation_token = cancellation_token.clone();
-        join_set.spawn(async move {
-            select! {
-                _ = cancellation_token.cancelled() => Ok(()),
-                result = ctrl_c() => {
-                    info!("Ctrl-C pressed, shutting down...");
-                    cancellation_token.cancel();
-                    result.map_err(Into::into)
-                }
-            }
-        });
-    }
 
     let result = spawn_tasks(&mut join_set, &cancellation_token, args, program, sender).await;
 
@@ -83,7 +67,6 @@ async fn main() -> Result<()> {
         }
     }
 
-    // TODO: what about all of the other errors?
     if let Some(e) = errors.pop_front() {
         Err(e)
     } else {
@@ -99,6 +82,11 @@ async fn spawn_tasks(
     sender: Sender<Message>,
 ) -> Result<()> {
     let drop_guard = cancellation_token.clone().drop_guard();
+
+    {
+        let cancellation_token = cancellation_token.clone();
+        join_set.spawn(async move { ctrlc_handler::run(cancellation_token).await });
+    }
 
     if log_enabled!(Trace) {
         let rx = sender.subscribe();
@@ -147,6 +135,6 @@ async fn spawn_tasks(
     }
 
     drop_guard.disarm();
-    
+
     Ok(())
 }
