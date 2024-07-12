@@ -62,7 +62,6 @@ async fn main() -> Result<()> {
     let mut errors = VecDeque::new();
     if let Err(e) = result {
         errors.push_back(e);
-        cancellation_token.cancel();
     }
 
     while let Some(r) = join_set.join_next().await {
@@ -99,6 +98,8 @@ async fn spawn_tasks(
     program: Option<Program>,
     sender: Sender<Message>,
 ) -> Result<()> {
+    let drop_guard = cancellation_token.clone().drop_guard();
+
     if log_enabled!(Trace) {
         let rx = sender.subscribe();
         let cancellation_token = cancellation_token.clone();
@@ -145,5 +146,7 @@ async fn spawn_tasks(
         join_set.spawn(async move { refresher::run(cancellation_token, sender).await });
     }
 
+    drop_guard.disarm();
+    
     Ok(())
 }
