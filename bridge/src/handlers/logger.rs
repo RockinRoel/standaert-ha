@@ -1,10 +1,10 @@
 use crate::handlers::message::Message;
 use anyhow::Result;
+use log::{debug, error, info};
 use tokio::select;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::Receiver;
 use tokio_graceful_shutdown::SubsystemHandle;
-use log::{debug, error, info};
 
 struct Logger {
     subsys: SubsystemHandle,

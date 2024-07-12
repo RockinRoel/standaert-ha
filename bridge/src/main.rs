@@ -10,8 +10,8 @@ use crate::shal::bytecode::Program;
 use anyhow::Result;
 use clap::Parser;
 use if_chain::if_chain;
-use std::time::Duration;
 use log::info;
+use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
@@ -19,7 +19,7 @@ use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    
+
     let args = Args::parse();
 
     info!("Starting SHA bridge with arguments:\n{}", args);
