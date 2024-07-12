@@ -59,6 +59,42 @@ impl<'a> From<&'a EntityID> for &'a str {
     }
 }
 
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
+#[serde(try_from = "u8")]
+pub struct PinID {
+    id: u8,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("Invalid pin ID: {id}, ids must be in range [0, 32)")]
+pub struct InvalidPinIDError {
+    id: u8,
+}
+
+impl Display for PinID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.id, f)
+    }
+}
+
+impl TryFrom<u8> for PinID {
+    type Error = InvalidPinIDError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value < 32 {
+            Ok(PinID { id: value })
+        } else {
+            Err(InvalidPinIDError { id: value })
+        }
+    }
+}
+
+impl From<PinID> for u8 {
+    fn from(value: PinID) -> Self {
+        value.id
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct IODeclarations {
@@ -68,10 +104,10 @@ pub struct IODeclarations {
     pub outputs: HashMap<EntityID, IODeclaration>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct IODeclaration {
-    pub pin: u8,
+    pub pin: PinID,
     pub name: Option<String>,
 }
 
@@ -117,12 +153,12 @@ pub(super) enum Condition {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Input {
-    Number(u8),
+    Number(PinID),
     Entity(EntityID),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Output {
-    Number(u8),
+    Number(PinID),
     Entity(EntityID),
 }

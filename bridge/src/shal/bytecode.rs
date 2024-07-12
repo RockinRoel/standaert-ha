@@ -1,5 +1,5 @@
 use crate::controller::program_header::ProgramHeader;
-use crate::shal::ast::{IODeclarations, SourceLoc};
+use crate::shal::ast::{IODeclarations, PinID, SourceLoc};
 use crate::shal::common::{Edge, IsWas, Value};
 use crc::{Crc, CRC_16_XMODEM};
 use static_assertions::const_assert_eq;
@@ -147,18 +147,18 @@ pub(super) enum Instruction {
     Xor,
     Not,
     Set {
-        output: u8,
+        output: PinID,
         value: Value,
     },
     Toggle {
-        output: u8,
+        output: PinID,
     },
     On {
-        input: u8,
+        input: PinID,
         edge: Edge,
     },
     If {
-        number: u8,
+        number: PinID,
         is_was: IsWas,
         value: Value,
         in_out: InOut,
@@ -197,15 +197,15 @@ impl Instruction {
                 if value.as_bit() {
                     instr |= SET_VALUE_MASK;
                 }
-                InstructionEncoding::dual_byte(instr, output)
+                InstructionEncoding::dual_byte(instr, output.into())
             }
-            Instruction::Toggle { output } => InstructionEncoding::dual_byte(INSTR_TOGGLE, output),
+            Instruction::Toggle { output } => InstructionEncoding::dual_byte(INSTR_TOGGLE, output.into()),
             Instruction::On { input, edge } => {
                 let mut instr = INSTR_ON;
                 if edge.as_bit() {
                     instr |= ON_EDGE_MASK;
                 }
-                InstructionEncoding::dual_byte(instr, input)
+                InstructionEncoding::dual_byte(instr, input.into())
             }
             Instruction::If {
                 number,
@@ -224,7 +224,7 @@ impl Instruction {
                 if value.as_bit() {
                     instr |= IF_VALUE_MASK;
                 }
-                InstructionEncoding::dual_byte(instr, number)
+                InstructionEncoding::dual_byte(instr, number.into())
             }
         }
     }
@@ -244,19 +244,19 @@ impl Instruction {
                 let value = value & DUAL_BYTE_MASK;
                 if instr & INSTR_SET_MASK == INSTR_SET {
                     Ok(Instruction::Set {
-                        output: value,
+                        output: value.try_into().unwrap(),
                         value: Value::from_bit(instr & SET_VALUE_MASK != 0),
                     })
                 } else if instr & INSTR_TOGGLE_MASK == INSTR_TOGGLE {
-                    Ok(Instruction::Toggle { output: value })
+                    Ok(Instruction::Toggle { output: value.try_into().unwrap() })
                 } else if instr & INSTR_ON_MASK == INSTR_ON {
                     Ok(Instruction::On {
-                        input: value,
+                        input: value.try_into().unwrap(),
                         edge: Edge::from_bit(instr & ON_EDGE_MASK != 0),
                     })
                 } else if instr & INSTR_IF_MASK == INSTR_IF {
                     Ok(Instruction::If {
-                        number: value,
+                        number: value.try_into().unwrap(),
                         is_was: IsWas::from_bit(instr & IF_IS_WAS_MASK != 0),
                         value: Value::from_bit(instr & IF_VALUE_MASK != 0),
                         in_out: InOut::from_bit(instr & IF_IO_MASK != 0),
@@ -452,37 +452,37 @@ mod tests {
             declarations: IODeclarations::default(),
             instructions: vec![
                 On {
-                    input: 0,
+                    input: 0.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 0 },
+                Toggle { output: 0.try_into().unwrap() },
                 Pop,
                 On {
-                    input: 1,
+                    input: 1.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 1 },
+                Toggle { output: 1.try_into().unwrap() },
                 Pop,
                 If {
-                    number: 0,
+                    number: 0.try_into().unwrap(),
                     value: Value::High,
                     is_was: IsWas::Is,
                     in_out: InOut::Output,
                 },
                 If {
-                    number: 1,
+                    number: 1.try_into().unwrap(),
                     value: Value::High,
                     is_was: IsWas::Is,
                     in_out: InOut::Output,
                 },
                 Or,
                 Set {
-                    output: 2,
+                    output: 2.try_into().unwrap(),
                     value: Value::High,
                 },
                 Not,
                 Set {
-                    output: 2,
+                    output: 2.try_into().unwrap(),
                     value: Value::Low,
                 },
                 Pop,

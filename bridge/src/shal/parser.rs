@@ -1,10 +1,13 @@
-use crate::shal::ast::{Action, Condition, EntityID, Input, Output, Program, Statement};
+use std::collections::HashSet;
+use std::hash::Hash;
+use crate::shal::ast::{Action, Condition, EntityID, Input, InvalidEntityIDError, InvalidPinIDError, IODeclarations, Output, PinID, Program, Statement};
 use crate::shal::common::{Edge, IsWas, Value};
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 use regex::RegexBuilder;
 use thiserror::Error;
+use crate::shal::parser::ParseError::{DoubleInputPinError, DoubleOutputPinError, DuplicateEntityIDError};
 
 #[derive(Parser)]
 #[grammar = "shal/shal.pest"]
@@ -16,6 +19,22 @@ pub enum ParseError {
     EntityParseError(#[from] deser_hjson::Error),
     #[error("Failed to parse program")]
     PestParseError(#[from] Box<pest::error::Error<Rule>>),
+    #[error("Duplicate entity id: {id}, all entity ids must be unique")]
+    DuplicateEntityIDError {
+        id: EntityID,
+    },
+    #[error("Double use of input pin {pin} for two different inputs")]
+    DoubleInputPinError {
+        pin: PinID,
+    },
+    #[error("Double use of output pin {pin} for two different outputs")]
+    DoubleOutputPinError {
+        pin: PinID,
+    },
+    #[error("Invalid pin ID")]
+    InvalidPinIDError(#[from] InvalidPinIDError),
+    #[error("Invalid entity ID")]
+    InvalidEntityIDError(#[from] InvalidEntityIDError),
 }
 
 pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
@@ -29,6 +48,7 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
     if splits.len() == 2 {
         let first_split = *splits.first().unwrap_or_else(|| unreachable!());
         let declarations = deser_hjson::from_str(first_split)?;
+        validate_declarations(&declarations)?;
         program.declarations = declarations;
     }
 
@@ -45,80 +65,106 @@ pub(crate) fn parse(input: &str) -> Result<Program, ParseError> {
 
     for pair in pest_program.into_inner() {
         if Rule::top_level_statement == pair.as_rule() {
-            program.statements.push(handle_statement(pair));
+            program.statements.push(handle_statement(pair)?);
         }
     }
 
     Ok(program)
 }
 
-fn handle_statement(pair: Pair<Rule>) -> Statement {
-    let statement = pair.into_inner().next().unwrap();
-    match statement.as_rule() {
-        Rule::action => handle_action(statement),
-        Rule::condition_block => handle_condition_block(statement),
-        Rule::event_block => handle_event_block(statement),
-        _ => {
-            unimplemented!()
-        }
+fn validate_declarations(declarations: &IODeclarations) -> Result<(), ParseError> {
+    let inputs = &declarations.inputs;
+    let outputs = &declarations.outputs;
+    if let Some(id) = find_double(inputs.keys().chain(outputs.keys())) {
+        return Err(DuplicateEntityIDError { id: id.clone() });
     }
+    if let Some(pin) = find_double(inputs.values().map(|d| d.pin)) {
+        return Err(DoubleInputPinError { pin });
+    }
+    if let Some(pin) = find_double(outputs.values().map(|d| d.pin)) {
+        return Err(DoubleOutputPinError { pin });
+    }
+    Ok(())
 }
 
-fn handle_action(pair: Pair<Rule>) -> Statement {
-    let action = pair.into_inner().next().unwrap();
-    Statement::Action(match action.as_rule() {
-        Rule::toggle_action => handle_toggle_action(action),
-        Rule::set_action => handle_set_action(action),
+fn find_double<Item: Eq + Hash, I: Iterator<Item = Item>>(iterator: I) -> Option<Item> {
+    let mut set = HashSet::new();
+    for i in iterator {
+        if set.contains(&i) {
+            return Some(i);
+        }
+        set.insert(i);
+    }
+    None
+}
+
+fn handle_statement(pair: Pair<Rule>) -> Result<Statement, ParseError> {
+    let statement = pair.into_inner().next().unwrap();
+    Ok(match statement.as_rule() {
+        Rule::action => handle_action(statement)?,
+        Rule::condition_block => handle_condition_block(statement)?,
+        Rule::event_block => handle_event_block(statement)?,
         _ => {
             unimplemented!()
         }
     })
 }
 
-fn handle_toggle_action(pair: Pair<Rule>) -> Action {
-    Action::Toggle(handle_output_or_entity_id(
+fn handle_action(pair: Pair<Rule>) -> Result<Statement, ParseError> {
+    let action = pair.into_inner().next().unwrap();
+    Ok(Statement::Action(match action.as_rule() {
+        Rule::toggle_action => handle_toggle_action(action)?,
+        Rule::set_action => handle_set_action(action)?,
+        _ => {
+            unimplemented!()
+        }
+    }))
+}
+
+fn handle_toggle_action(pair: Pair<Rule>) -> Result<Action, ParseError> {
+    Ok(Action::Toggle(handle_output_or_entity_id(
         pair.into_inner().next().unwrap(),
-    ))
+    )?))
 }
 
-fn handle_input_or_entity_id(pair: Pair<Rule>) -> Input {
-    match pair.as_rule() {
-        Rule::input => Input::Number(handle_input(pair)),
-        Rule::entity_id => Input::Entity(handle_entity_id(pair)),
+fn handle_input_or_entity_id(pair: Pair<Rule>) -> Result<Input, ParseError> {
+    Ok(match pair.as_rule() {
+        Rule::input => Input::Number(handle_input(pair)?),
+        Rule::entity_id => Input::Entity(handle_entity_id(pair)?),
         _ => {
             unimplemented!()
         }
-    }
+    })
 }
 
-fn handle_output_or_entity_id(pair: Pair<Rule>) -> Output {
-    match pair.as_rule() {
-        Rule::output => Output::Number(handle_output(pair)),
-        Rule::entity_id => Output::Entity(handle_entity_id(pair)),
+fn handle_output_or_entity_id(pair: Pair<Rule>) -> Result<Output, ParseError> {
+    Ok(match pair.as_rule() {
+        Rule::output => Output::Number(handle_output(pair)?),
+        Rule::entity_id => Output::Entity(handle_entity_id(pair)?),
         _ => {
             unimplemented!()
         }
-    }
+    })
 }
 
-fn handle_input(pair: Pair<Rule>) -> u8 {
+fn handle_input(pair: Pair<Rule>) -> Result<PinID, ParseError> {
     handle_number(pair.into_inner().next().unwrap())
 }
 
-fn handle_output(pair: Pair<Rule>) -> u8 {
+fn handle_output(pair: Pair<Rule>) -> Result<PinID, ParseError> {
     handle_number(pair.into_inner().next().unwrap())
 }
 
-fn handle_number(pair: Pair<Rule>) -> u8 {
-    if pair.as_rule() == Rule::number {
-        pair.as_str().parse().unwrap()
+fn handle_number(pair: Pair<Rule>) -> Result<PinID, ParseError> {
+    if pair.as_rule() == Rule::pin_id {
+        Ok(pair.as_str().parse::<u8>().unwrap().try_into()?)
     } else {
         unimplemented!()
     }
 }
 
-fn handle_entity_id(pair: Pair<Rule>) -> EntityID {
-    pair.as_str().to_owned().try_into().unwrap() // TODO(Roel): What if this fails?
+fn handle_entity_id(pair: Pair<Rule>) -> Result<EntityID, ParseError> {
+    Ok(pair.as_str().to_owned().try_into()?)
 }
 
 fn handle_value(pair: Pair<Rule>) -> Value {
@@ -129,78 +175,78 @@ fn handle_value(pair: Pair<Rule>) -> Value {
     }
 }
 
-fn handle_set_action(pair: Pair<Rule>) -> Action {
+fn handle_set_action(pair: Pair<Rule>) -> Result<Action, ParseError> {
     let mut pairs = pair.into_inner();
-    let output = handle_output_or_entity_id(pairs.next().unwrap());
+    let output = handle_output_or_entity_id(pairs.next().unwrap())?;
     let value = handle_value(pairs.next().unwrap());
-    Action::Set(output, value)
+    Ok(Action::Set(output, value))
 }
 
-fn handle_condition_block(pair: Pair<Rule>) -> Statement {
+fn handle_condition_block(pair: Pair<Rule>) -> Result<Statement, ParseError> {
     let mut pairs = pair.into_inner();
-    let (condition, if_statements) = handle_if_block(pairs.next().unwrap());
+    let (condition, if_statements) = handle_if_block(pairs.next().unwrap())?;
     let else_statements = if let Some(else_block) = pairs.next() {
-        handle_else_block(else_block)
+        handle_else_block(else_block)?
     } else {
         vec![]
     };
-    Statement::IfElse(condition, if_statements, else_statements)
+    Ok(Statement::IfElse(condition, if_statements, else_statements))
 }
 
-fn handle_if_block(pair: Pair<Rule>) -> (Condition, Vec<Statement>) {
+fn handle_if_block(pair: Pair<Rule>) -> Result<(Condition, Vec<Statement>), ParseError> {
     let mut pairs = pair.into_inner();
-    let condition = handle_condition(pairs.next().unwrap());
-    let statements = pairs.map(|pair| handle_statement(pair)).collect();
-    (condition, statements)
+    let condition = handle_condition(pairs.next().unwrap())?;
+    let statements: Result<Vec<_>, _> = pairs.map(|pair| handle_statement(pair)).collect();
+    Ok((condition, statements?))
 }
 
-fn handle_else_block(pair: Pair<Rule>) -> Vec<Statement> {
+fn handle_else_block(pair: Pair<Rule>) -> Result<Vec<Statement>, ParseError> {
     let mut pairs = pair.into_inner();
     if let Some(next) = pairs.next() {
-        match next.as_rule() {
+        Ok(match next.as_rule() {
             Rule::condition_block => {
-                vec![handle_condition_block(next)]
+                vec![handle_condition_block(next)?]
             }
             Rule::statement => {
-                let mut result = vec![handle_statement(next)];
+                let mut result = vec![handle_statement(next)?];
                 for statement in pairs {
-                    result.push(handle_statement(statement));
+                    result.push(handle_statement(statement)?);
                 }
                 result
             }
             _ => unimplemented!(),
-        }
+        })
     } else {
-        vec![]
+        Ok(vec![])
     }
 }
 
-fn handle_condition(pair: Pair<Rule>) -> Condition {
+fn handle_condition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
     let mut pairs = pair.into_inner();
-    let lcondition = handle_lcondition(pairs.next().unwrap());
+    let lcondition = handle_lcondition(pairs.next().unwrap())?;
     if let Some(boolean_operator) = pairs.next() {
-        let rcondition = handle_condition(pairs.next().unwrap());
-        match boolean_operator.as_str() {
+        let rcondition = handle_condition(pairs.next().unwrap())?;
+        Ok(match boolean_operator.as_str() {
             "and" => Condition::And(Box::new(lcondition), Box::new(rcondition)),
             "or" => Condition::Or(Box::new(lcondition), Box::new(rcondition)),
             "xor" => Condition::Xor(Box::new(lcondition), Box::new(rcondition)),
             _ => unimplemented!(),
-        }
+        })
     } else {
-        lcondition
+        Ok(lcondition)
     }
 }
 
-fn handle_lcondition(pair: Pair<Rule>) -> Condition {
+fn handle_lcondition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
     let condition = pair.into_inner().next().unwrap();
-    match condition.as_rule() {
-        Rule::condition => handle_condition(condition),
-        Rule::input_condition => handle_input_condition(condition),
-        Rule::output_condition => handle_output_condition(condition),
-        Rule::not_condition => handle_not_condition(condition),
-        Rule::entity_condition => handle_entity_condition(condition),
+    Ok(match condition.as_rule() {
+        Rule::condition => handle_condition(condition)?,
+        Rule::input_condition => handle_input_condition(condition)?,
+        Rule::output_condition => handle_output_condition(condition)?,
+        Rule::not_condition => handle_not_condition(condition)?,
+        Rule::entity_condition => handle_entity_condition(condition)?,
         _ => unimplemented!(),
-    }
+    })
 }
 
 fn handle_tspec(pair: Pair<Rule>) -> IsWas {
@@ -211,54 +257,54 @@ fn handle_tspec(pair: Pair<Rule>) -> IsWas {
     }
 }
 
-fn handle_input_condition(pair: Pair<Rule>) -> Condition {
+fn handle_input_condition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
     let mut pairs = pair.into_inner();
-    let input = Input::Number(handle_input(pairs.next().unwrap()));
+    let input = Input::Number(handle_input(pairs.next().unwrap())?);
     let tspec = handle_tspec(pairs.next().unwrap());
     let value = handle_value(pairs.next().unwrap());
-    Condition::Input(input, tspec, value)
+    Ok(Condition::Input(input, tspec, value))
 }
 
-fn handle_output_condition(pair: Pair<Rule>) -> Condition {
+fn handle_output_condition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
     let mut pairs = pair.into_inner();
-    let output = Output::Number(handle_output(pairs.next().unwrap()));
+    let output = Output::Number(handle_output(pairs.next().unwrap())?);
     let tspec = handle_tspec(pairs.next().unwrap());
     let value = handle_value(pairs.next().unwrap());
-    Condition::Output(output, tspec, value)
+    Ok(Condition::Output(output, tspec, value))
 }
 
-fn handle_not_condition(pair: Pair<Rule>) -> Condition {
-    Condition::Not(Box::new(handle_lcondition(
+fn handle_not_condition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
+    Ok(Condition::Not(Box::new(handle_lcondition(
         pair.into_inner().next().unwrap(),
-    )))
+    )?)))
 }
 
-fn handle_entity_condition(pair: Pair<Rule>) -> Condition {
+fn handle_entity_condition(pair: Pair<Rule>) -> Result<Condition, ParseError> {
     let mut pairs = pair.into_inner();
-    let entity = handle_entity_id(pairs.next().unwrap());
+    let entity = handle_entity_id(pairs.next().unwrap())?;
     let tspec = handle_tspec(pairs.next().unwrap());
     let value = handle_value(pairs.next().unwrap());
-    Condition::Entity(entity, tspec, value)
+    Ok(Condition::Entity(entity, tspec, value))
 }
 
-fn handle_event_block(pair: Pair<Rule>) -> Statement {
+fn handle_event_block(pair: Pair<Rule>) -> Result<Statement, ParseError> {
     let mut pairs = pair.into_inner();
-    let (edge, input) = handle_event(pairs.next().unwrap());
+    let (edge, input) = handle_event(pairs.next().unwrap())?;
     let next = pairs.next();
     if let Some(next) = next {
-        match next.as_rule() {
+        Ok(match next.as_rule() {
             Rule::action => Statement::Event {
                 edge,
                 input,
-                statements: vec![handle_action(next)],
+                statements: vec![handle_action(next)?],
             },
             Rule::statement => {
                 let mut statements = vec![];
-                statements.push(handle_statement(next));
+                statements.push(handle_statement(next)?);
                 for statement in pairs {
                     match statement.as_rule() {
                         Rule::statement => {
-                            statements.push(handle_statement(statement));
+                            statements.push(handle_statement(statement)?);
                         }
                         _ => unimplemented!(),
                     }
@@ -270,21 +316,21 @@ fn handle_event_block(pair: Pair<Rule>) -> Statement {
                 }
             }
             _ => unimplemented!(),
-        }
+        })
     } else {
-        Statement::Event {
+        Ok(Statement::Event {
             edge,
             input,
             statements: vec![],
-        }
+        })
     }
 }
 
-fn handle_event(pair: Pair<Rule>) -> (Edge, Input) {
+fn handle_event(pair: Pair<Rule>) -> Result<(Edge, Input), ParseError> {
     let mut pairs = pair.into_inner();
     let edge = handle_edge(pairs.next().unwrap());
-    let input = handle_input_or_entity_id(pairs.next().unwrap());
-    (edge, input)
+    let input = handle_input_or_entity_id(pairs.next().unwrap())?;
+    Ok((edge, input))
 }
 
 fn handle_edge(pair: Pair<Rule>) -> Edge {
@@ -314,7 +360,7 @@ mod tests {
                     inputs: HashMap::from([(
                         "button".try_into().unwrap(),
                         IODeclaration {
-                            pin: 12,
+                            pin: 12.try_into().unwrap(),
                             name: None
                         }
                     ),]),
@@ -331,7 +377,7 @@ mod tests {
                     outputs: HashMap::from([(
                         "light".try_into().unwrap(),
                         IODeclaration {
-                            pin: 12,
+                            pin: 12.try_into().unwrap(),
                             name: None
                         }
                     ),]),
@@ -343,7 +389,7 @@ mod tests {
             &parse("toggle output 1;").unwrap(),
             &Program {
                 declarations: Default::default(),
-                statements: vec![Statement::Action(Action::Toggle(Output::Number(1)),)],
+                statements: vec![Statement::Action(Action::Toggle(Output::Number(1.try_into().unwrap())),)],
             }
         );
         assert_eq!(
@@ -360,7 +406,7 @@ mod tests {
             &Program {
                 declarations: Default::default(),
                 statements: vec![Statement::Action(Action::Set(
-                    Output::Number(3),
+                    Output::Number(3.try_into().unwrap()),
                     Value::High
                 ))],
             }
@@ -381,8 +427,8 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::Event {
                     edge: common::Edge::Rising,
-                    input: Input::Number(3),
-                    statements: vec![Statement::Action(Action::Toggle(Output::Number(4))),],
+                    input: Input::Number(3.try_into().unwrap()),
+                    statements: vec![Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),],
                 },]
             }
         );
@@ -392,10 +438,10 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::Event {
                     edge: common::Edge::Falling,
-                    input: Input::Number(5),
+                    input: Input::Number(5.try_into().unwrap()),
                     statements: vec![
-                        Statement::Action(Action::Toggle(Output::Number(4))),
-                        Statement::Action(Action::Set(Output::Number(6), Value::High,)),
+                        Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),
+                        Statement::Action(Action::Set(Output::Number(6.try_into().unwrap()), Value::High,)),
                     ],
                 },]
             }
@@ -407,7 +453,7 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Xor(
-                        Box::new(Condition::Input(Input::Number(4), IsWas::Is, Value::Low)),
+                        Box::new(Condition::Input(Input::Number(4.try_into().unwrap()), IsWas::Is, Value::Low)),
                         Box::new(Condition::Entity(
                             "light_upstairs".try_into().unwrap(),
                             IsWas::Was,
@@ -415,7 +461,7 @@ mod tests {
                         )),
                     ),
                     vec![],
-                    vec![Statement::Action(Action::Toggle(Output::Number(4))),],
+                    vec![Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),],
                 )],
             }
         );
@@ -425,9 +471,9 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Or(
-                        Box::new(Condition::Output(Output::Number(5), IsWas::Is, Value::High)),
+                        Box::new(Condition::Output(Output::Number(5.try_into().unwrap()), IsWas::Is, Value::High)),
                         Box::new(Condition::Output(
-                            Output::Number(20),
+                            Output::Number(20.try_into().unwrap()),
                             IsWas::Is,
                             Value::High
                         )),

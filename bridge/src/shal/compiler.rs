@@ -1,4 +1,4 @@
-use crate::shal::ast::{EntityID, IODeclaration, IODeclarations};
+use crate::shal::ast::{EntityID, IODeclaration, IODeclarations, PinID};
 use crate::shal::bytecode::Instruction;
 use crate::shal::common;
 use crate::shal::compiler::CompileError::UnknownEntityError;
@@ -15,17 +15,6 @@ fn loc_to_string(source_loc: &Option<ast::SourceLoc>) -> String {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum CompileError {
-    #[error(
-        "Duplicate entity: {0} at {1}, first defined at {2}",
-        name,
-        loc_to_string(second_loc),
-        loc_to_string(first_loc)
-    )]
-    DuplicateEntityError {
-        name: String,
-        first_loc: Option<ast::SourceLoc>,
-        second_loc: Option<ast::SourceLoc>,
-    },
     #[error("Unknown entity: {0} at {1}", name, loc_to_string(location))]
     UnknownEntityError {
         name: EntityID,
@@ -33,7 +22,7 @@ pub enum CompileError {
     },
 }
 
-fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<u8, CompileError> {
+fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<PinID, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
@@ -52,7 +41,7 @@ fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<u
 fn retrieve_output(
     declarations: &IODeclarations,
     output: &ast::Output,
-) -> Result<u8, CompileError> {
+) -> Result<PinID, CompileError> {
     match output {
         ast::Output::Number(number) => Ok(*number),
         ast::Output::Entity(entity_id) => {
@@ -71,7 +60,7 @@ fn retrieve_output(
 fn retrieve_entity(
     declarations: &IODeclarations,
     entity_id: &EntityID,
-) -> Result<(u8, bytecode::InOut), CompileError> {
+) -> Result<(PinID, bytecode::InOut), CompileError> {
     retrieve_input(declarations, &ast::Input::Entity(entity_id.clone()))
         .map(|i| (i, bytecode::InOut::Input))
         .or_else(|_| {
@@ -231,25 +220,25 @@ mod tests {
                 inputs: HashMap::from([
                     (
                         "button_downstairs".try_into().unwrap(),
-                        IODeclaration { pin: 0, name: None },
+                        IODeclaration { pin: 0.try_into().unwrap(), name: None },
                     ),
                     (
                         "button_upstairs".try_into().unwrap(),
-                        IODeclaration { pin: 1, name: None },
+                        IODeclaration { pin: 1.try_into().unwrap(), name: None },
                     ),
                 ]),
                 outputs: HashMap::from([
                     (
                         "light_downstairs".try_into().unwrap(),
-                        IODeclaration { pin: 0, name: None },
+                        IODeclaration { pin: 0.try_into().unwrap(), name: None },
                     ),
                     (
                         "light_upstairs".try_into().unwrap(),
-                        IODeclaration { pin: 1, name: None },
+                        IODeclaration { pin: 1.try_into().unwrap(), name: None },
                     ),
                     (
                         "light_stairs".try_into().unwrap(),
-                        IODeclaration { pin: 2, name: None },
+                        IODeclaration { pin: 2.try_into().unwrap(), name: None },
                     ),
                 ]),
             },
@@ -300,61 +289,61 @@ mod tests {
                     inputs: HashMap::from([
                         (
                             "button_downstairs".try_into().unwrap(),
-                            IODeclaration { pin: 0, name: None }
+                            IODeclaration { pin: 0.try_into().unwrap(), name: None }
                         ),
                         (
                             "button_upstairs".try_into().unwrap(),
-                            IODeclaration { pin: 1, name: None }
+                            IODeclaration { pin: 1.try_into().unwrap(), name: None }
                         ),
                     ]),
                     outputs: HashMap::from([
                         (
                             "light_downstairs".try_into().unwrap(),
-                            IODeclaration { pin: 0, name: None }
+                            IODeclaration { pin: 0.try_into().unwrap(), name: None }
                         ),
                         (
                             "light_upstairs".try_into().unwrap(),
-                            IODeclaration { pin: 1, name: None }
+                            IODeclaration { pin: 1.try_into().unwrap(), name: None }
                         ),
                         (
                             "light_stairs".try_into().unwrap(),
-                            IODeclaration { pin: 2, name: None }
+                            IODeclaration { pin: 2.try_into().unwrap(), name: None }
                         ),
                     ]),
                 },
                 instructions: vec![
                     Instruction::On {
-                        input: 0,
+                        input: 0.try_into().unwrap(),
                         edge: Edge::Rising,
                     },
-                    Instruction::Toggle { output: 0 },
+                    Instruction::Toggle { output: 0.try_into().unwrap() },
                     Instruction::Pop,
                     Instruction::On {
-                        input: 1,
+                        input: 1.try_into().unwrap(),
                         edge: Edge::Rising,
                     },
-                    Instruction::Toggle { output: 1 },
+                    Instruction::Toggle { output: 1.try_into().unwrap() },
                     Instruction::Pop,
                     Instruction::If {
-                        number: 0,
+                        number: 0.try_into().unwrap(),
                         value: Value::High,
                         is_was: IsWas::Is,
                         in_out: bytecode::InOut::Output,
                     },
                     Instruction::If {
-                        number: 1,
+                        number: 1.try_into().unwrap(),
                         value: Value::High,
                         is_was: IsWas::Is,
                         in_out: bytecode::InOut::Output,
                     },
                     Instruction::Or,
                     Instruction::Set {
-                        output: 2,
+                        output: 2.try_into().unwrap(),
                         value: Value::High,
                     },
                     Instruction::Not,
                     Instruction::Set {
-                        output: 2,
+                        output: 2.try_into().unwrap(),
                         value: Value::Low,
                     },
                     Instruction::Pop,

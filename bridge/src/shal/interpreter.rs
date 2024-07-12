@@ -177,12 +177,12 @@ fn run_program(
                 };
                 state
                     .stack
-                    .push(&Value::from_bit(bitset.get(*number).unwrap()) == value)
+                    .push(&Value::from_bit(bitset.get((*number).into()).unwrap()) == value)
                     .unwrap();
             }
             Instruction::On { input, edge } => {
-                let before = Value::from_bit(state.input_old.get(*input).unwrap());
-                let now = Value::from_bit(state.input_new.get(*input).unwrap());
+                let before = Value::from_bit(state.input_old.get((*input).into()).unwrap());
+                let now = Value::from_bit(state.input_new.get((*input).into()).unwrap());
                 state
                     .stack
                     .push(matches!(
@@ -193,11 +193,11 @@ fn run_program(
                     .unwrap();
             }
             Instruction::Toggle { output } if state.stack.all_one() => {
-                let before = state.output_new.get(*output).unwrap();
-                state.output_new.set(*output, !before).unwrap();
+                let before = state.output_new.get((*output).into()).unwrap();
+                state.output_new.set((*output).into(), !before).unwrap();
             }
             Instruction::Set { output, value } if state.stack.all_one() => {
-                state.output_new.set(*output, value.as_bit()).unwrap();
+                state.output_new.set((*output).into(), value.as_bit()).unwrap();
             }
             _ => {}
         }
@@ -218,37 +218,37 @@ mod tests {
             declarations: Default::default(),
             instructions: vec![
                 On {
-                    input: 0,
+                    input: 0.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 0 },
+                Toggle { output: 0.try_into().unwrap() },
                 Pop,
                 On {
-                    input: 1,
+                    input: 1.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 1 },
+                Toggle { output: 1.try_into().unwrap() },
                 Pop,
                 If {
-                    number: 0,
+                    number: 0.try_into().unwrap(),
                     value: Value::High,
                     is_was: IsWas::Is,
                     in_out: InOut::Output,
                 },
                 If {
-                    number: 1,
+                    number: 1.try_into().unwrap(),
                     value: Value::High,
                     is_was: IsWas::Is,
                     in_out: InOut::Output,
                 },
                 Or,
                 Set {
-                    output: 2,
+                    output: 2.try_into().unwrap(),
                     value: Value::High,
                 },
                 Not,
                 Set {
-                    output: 2,
+                    output: 2.try_into().unwrap(),
                     value: Value::Low,
                 },
                 Pop,

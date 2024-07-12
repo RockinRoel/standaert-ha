@@ -26,8 +26,8 @@ set_action = {
   | kw_set ~ entity_id ~ value
 }
 
-input  = { kw_input ~ number }
-output = { kw_output ~ number }
+input  = { kw_input ~ pin_id }
+output = { kw_output ~ pin_id }
 
 value = {
     kw_low
@@ -117,7 +117,7 @@ kw_is     = _{ "is" }
 kw_was    = _{ "was" }
 
 entity_id = @{ ASCII_ALPHA ~ ("_" | ASCII_ALPHANUMERIC)* }
-number    = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+pin_id    = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
 
 COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* }
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
