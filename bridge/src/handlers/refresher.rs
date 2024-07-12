@@ -15,8 +15,14 @@ struct Refresher {
     tx: Sender<Message>,
 }
 
-pub async fn run(cancellation_token: CancellationToken, tx: Sender<Message>) -> Result<(), anyhow::Error> {
-    let refresher = Refresher { cancellation_token, tx };
+pub async fn run(
+    cancellation_token: CancellationToken,
+    tx: Sender<Message>,
+) -> Result<(), anyhow::Error> {
+    let refresher = Refresher {
+        cancellation_token,
+        tx,
+    };
     refresher.run().await;
     Ok(())
 }

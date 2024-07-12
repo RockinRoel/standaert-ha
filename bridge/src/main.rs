@@ -6,20 +6,22 @@ pub mod shal;
 use crate::args::Args;
 use crate::handlers::message::Message;
 use crate::handlers::mqtt_handler::{MqttHandler, MqttHandlerConfig};
+use crate::handlers::serial_handler::SerialHandler;
 use crate::handlers::{logger, programmer, refresher};
 use crate::shal::bytecode::Program;
 use anyhow::Result;
 use clap::Parser;
-use tokio::select;
 use if_chain::if_chain;
 use log::Level::Trace;
 use log::{info, log_enabled};
+use std::collections::VecDeque;
+use std::panic;
+use tokio::select;
 use tokio::signal::ctrl_c;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
-use crate::handlers::serial_handler::SerialHandler;
 
 const BROADCAST_CHANNEL_CAPACITY: usize = 100;
 
@@ -47,6 +49,7 @@ async fn main() -> Result<()> {
             select! {
                 _ = cancellation_token.cancelled() => Ok(()),
                 result = ctrl_c() => {
+                    info!("Ctrl-C pressed, shutting down...");
                     cancellation_token.cancel();
                     result.map_err(Into::into)
                 }
@@ -55,24 +58,34 @@ async fn main() -> Result<()> {
     }
 
     let result = spawn_tasks(&mut join_set, &cancellation_token, args, program, sender).await;
-    
-    if result.is_err() {
-        cancellation_token.cancel();
-    }
-    
-    let mut errors = vec![];
+
+    let mut errors = VecDeque::new();
     if let Err(e) = result {
-        errors.push(e);
+        errors.push_back(e);
+        cancellation_token.cancel();
     }
 
     while let Some(r) = join_set.join_next().await {
-        if let Err(e) = r {
-            errors.push(e.into());
+        match r {
+            // Task completed successfully
+            Ok(Ok(())) => {}
+            // Task completed with error, cancel all other tasks
+            Ok(Err(e)) => {
+                errors.push_back(e);
+                cancellation_token.cancel();
+            }
+            // Join error
+            Err(join_error) => {
+                // Propagate panic
+                if let Ok(reason) = join_error.try_into_panic() {
+                    panic::resume_unwind(reason);
+                }
+            }
         }
     }
 
-    // TODO: what about all of the other errors
-    if let Some(e) = errors.pop() {
+    // TODO: what about all of the other errors?
+    if let Some(e) = errors.pop_front() {
         Err(e)
     } else {
         Ok(())
@@ -89,9 +102,7 @@ async fn spawn_tasks(
     if log_enabled!(Trace) {
         let rx = sender.subscribe();
         let cancellation_token = cancellation_token.clone();
-        join_set.spawn(
-            async move { logger::run(cancellation_token, rx).await },
-        );
+        join_set.spawn(async move { logger::run(cancellation_token, rx).await });
     }
 
     if let Some(mqtt_url) = &args.mqtt_url {
@@ -107,18 +118,14 @@ async fn spawn_tasks(
         )?;
         let sender = sender.clone();
         let handler = MqttHandler::new(cancellation_token.clone(), config, sender).await?;
-        join_set.spawn(
-            async move { handler.run().await.map_err(Into::into) },
-        );
+        join_set.spawn(async move { handler.run().await.map_err(Into::into) });
     }
 
     if let Some(serial_port) = &args.serial {
         let cancellation_token = cancellation_token.clone();
         let sender = sender.clone();
         let handler = SerialHandler::new(cancellation_token, serial_port, sender).await?;
-        join_set.spawn(async move {
-            handler.run().await.map_err(Into::into)
-        });
+        join_set.spawn(async move { handler.run().await.map_err(Into::into) });
     }
 
     if_chain!(
@@ -135,9 +142,7 @@ async fn spawn_tasks(
 
     {
         let cancellation_token = cancellation_token.clone();
-        join_set.spawn(async move {
-            refresher::run(cancellation_token, sender).await
-        });
+        join_set.spawn(async move { refresher::run(cancellation_token, sender).await });
     }
 
     Ok(())
