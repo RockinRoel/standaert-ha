@@ -4,6 +4,7 @@ use tokio::select;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::Receiver;
 use tokio_graceful_shutdown::SubsystemHandle;
+use log::{debug, error, info};
 
 struct Logger {
     subsys: SubsystemHandle,
@@ -21,18 +22,18 @@ impl Logger {
         loop {
             select! {
                 _ = self.subsys.on_shutdown_requested() => {
-                    eprintln!("Logger shutting down...");
+                    info!("Logger shutting down...");
                     break
                 }
                 message = self.rx.recv() => {
                     match message {
-                        Ok(message) => eprintln!("Logging message: {message:?}"),
+                        Ok(message) => debug!("Logging message: {message:?}"),
                         Err(Closed) => {
-                            eprintln!("Logger can't receive any more messages, since there are no more senders.");
+                            error!("Logger can't receive any more messages, since there are no more senders.");
                             break;
                         }
                         Err(Lagged(num_messages)) => {
-                            eprintln!("Logger lagged behind {num_messages}!");
+                            error!("Logger lagged behind {num_messages}!");
                         }
                     }
                 }

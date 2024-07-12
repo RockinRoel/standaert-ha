@@ -8,6 +8,7 @@ use futures::SinkExt;
 use slip_codec::tokio::SlipCodec;
 use slip_codec::SlipError;
 use std::time::Duration;
+use log::error;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
@@ -89,7 +90,7 @@ impl SerialHandler {
             }
             Some(Err(_)) => {
                 // TODO(Roel): What to do on err?
-                eprintln!("SLIP Decoding error");
+                error!("SLIP Decoding error");
             }
             None => return Break, // TODO(Roel): what to do on none?
         }

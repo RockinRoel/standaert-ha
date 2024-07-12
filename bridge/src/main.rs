@@ -11,15 +11,18 @@ use anyhow::Result;
 use clap::Parser;
 use if_chain::if_chain;
 use std::time::Duration;
+use log::info;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
+    
     let args = Args::parse();
 
-    println!("Starting SHA bridge with arguments:\n{}", args);
+    info!("Starting SHA bridge with arguments:\n{}", args);
 
     let mut program = None;
     if let Some(program_path) = &args.program {

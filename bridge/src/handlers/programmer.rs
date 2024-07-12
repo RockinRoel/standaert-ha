@@ -8,6 +8,7 @@ use crate::handlers::programmer::State::{AwaitingAck, Uploading};
 use crate::shal::bytecode::Program;
 use crate::shal::{bytecode, compiler, parser};
 use std::io;
+use log::error;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
@@ -116,7 +117,7 @@ impl Programmer {
             },
             Ok(_) => {}
             Err(Lagged(num_messages)) => {
-                eprintln!("Programmer lagging behind {num_messages} messages!");
+                error!("Programmer lagging behind {num_messages} messages!");
             }
             Err(Closed) => return Done,
         }
