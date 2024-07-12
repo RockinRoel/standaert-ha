@@ -62,7 +62,9 @@ impl<'a> From<&'a EntityID> for &'a str {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct IODeclarations {
+    #[serde(with = "::serde_with::rust::maps_duplicate_key_is_error")]
     pub inputs: HashMap<EntityID, IODeclaration>,
+    #[serde(with = "::serde_with::rust::maps_duplicate_key_is_error")]
     pub outputs: HashMap<EntityID, IODeclaration>,
 }
 
