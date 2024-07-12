@@ -10,6 +10,7 @@ authors = ["Roel Standaert <roel@arres.be>"]
 tokio = { version = "1", features = ["full"] }
 rumqttc = { version = "0.24", features = ["url"] }
 tokio-serial = "5.4"
+tokio-graceful-shutdown = "0.15"
 pest = "2.7"
 pest_derive = "2.7"
 static_assertions = "1.1"

@@ -9,13 +9,11 @@ use crate::handlers::{logger, mqtt_handler, programmer, refresher, serial_handle
 use crate::shal::bytecode::Program;
 use anyhow::Result;
 use clap::Parser;
-use futures::future::join_all;
 use if_chain::if_chain;
+use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
-use tokio::task::JoinHandle;
-use tokio::{select, signal};
-use tokio_util::sync::CancellationToken;
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,47 +27,25 @@ async fn main() -> Result<()> {
     }
 
     let (sender, _receiver) = broadcast::channel(100);
-    let cancellation_token = CancellationToken::new();
 
-    let mut tasks = vec![];
-
-    let result = spawn_tasks(
-        &mut tasks,
-        &args,
-        program,
-        &sender,
-        cancellation_token.clone(),
-    )
-    .await;
-
-    if let Ok(()) = result {
-        select! {
-            _ = cancellation_token.cancelled() => {}
-            _ = signal::ctrl_c() => cancellation_token.cancel(),
-        }
-    } else {
-        // Error occurred, cleanly terminate all started tasks
-        cancellation_token.cancel();
-    }
-
-    // TODO(Roel): tasks may exit with error?
-    join_all(tasks).await;
-
-    result
+    Toplevel::new(move |s| spawn_subsystems(s, args, program, sender))
+        .catch_signals()
+        .handle_shutdown_requests(Duration::from_secs(1))
+        .await
+        .map_err(Into::into)
 }
 
-async fn spawn_tasks(
-    tasks: &mut Vec<JoinHandle<()>>,
-    args: &Args,
+async fn spawn_subsystems(
+    handle: SubsystemHandle,
+    args: Args,
     program: Option<Program>,
-    sender: &Sender<Message>,
-    cancellation_token: CancellationToken,
-) -> Result<()> {
+    sender: Sender<Message>,
+) {
     if args.debug {
-        tasks.push(logger::start(
-            sender.subscribe(),
-            cancellation_token.clone(),
-        ));
+        let rx = sender.subscribe();
+        handle.start(SubsystemBuilder::new("Debug logger", |subsys| {
+            logger::run(subsys, rx)
+        }));
     }
 
     if let Some(mqtt_url) = &args.mqtt_url {
@@ -77,39 +53,38 @@ async fn spawn_tasks(
         if let (Some(user), Some(password)) = (&args.mqtt_user, &args.mqtt_password) {
             credentials = Some((user.clone(), password.clone()));
         }
-        let task = mqtt_handler::start(
-            mqtt_url.clone(),
-            credentials,
-            args.prefix.clone(),
-            program.clone(),
-            sender.clone(),
-            cancellation_token.clone(),
-        )
-        .await?;
-        tasks.push(task);
-
-        // TODO(Roel): we should wait until we're done with init?
+        let mqtt_url = mqtt_url.clone();
+        let args_prefix = args.prefix.clone();
+        let program = program.clone();
+        let sender = sender.clone();
+        handle.start(SubsystemBuilder::new("MQTT", |subsys| {
+            mqtt_handler::run(subsys, mqtt_url, credentials, args_prefix, program, sender)
+        }));
     }
 
     if let Some(serial_port) = &args.serial {
-        let task = serial_handler::start(
-            serial_port.clone(),
-            sender.clone(),
-            cancellation_token.clone(),
-        )
-        .await?;
-        tasks.push(task);
+        let serial_port = serial_port.clone();
+        let sender = sender.clone();
+        handle.start(SubsystemBuilder::new("Serial", |subsys| async move {
+            serial_handler::run(subsys, &serial_port, sender).await
+        }));
     }
 
     if_chain!(
         if let Some(program) = program;
         if args.upload;
         then {
-            tasks.push(programmer::start(program, sender.clone(), cancellation_token.clone()));
+            let sender = sender.clone();
+            handle.start(
+                SubsystemBuilder::new(
+                    "Programmer",
+                    |subsys| programmer::run(subsys, program, sender)
+                )
+            );
         }
     );
 
-    tasks.push(refresher::start(sender.clone(), cancellation_token.clone()));
-
-    Ok(())
+    handle.start(SubsystemBuilder::new("Refresher", |subsys| {
+        refresher::run(subsys, sender)
+    }));
 }

@@ -9,12 +9,11 @@ use crate::shal::bytecode::Program;
 use crate::shal::{bytecode, compiler, parser};
 use std::io;
 use thiserror::Error;
+use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::task::JoinHandle;
-use tokio::{select, spawn};
-use tokio_util::sync::CancellationToken;
+use tokio_graceful_shutdown::SubsystemHandle;
 
 #[derive(Copy, Clone)]
 enum State {
@@ -37,11 +36,11 @@ pub enum ProgrammerError {
 }
 
 struct Programmer {
+    subsys: SubsystemHandle,
     tx: Sender<Message>,
     rx: Receiver<Message>,
     state: State,
     program: Program,
-    cancellation_token: CancellationToken,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -60,11 +59,11 @@ pub async fn compile(program_path: &str) -> Result<Program, ProgrammerError> {
     Ok(program)
 }
 
-pub fn start(
+pub async fn run(
+    subsys: SubsystemHandle,
     program: Program,
     sender: Sender<Message>,
-    cancellation_token: CancellationToken,
-) -> JoinHandle<()> {
+) -> Result<(), anyhow::Error> {
     sender
         .send(SendToController(ProgramStart {
             header: program.header(),
@@ -73,24 +72,25 @@ pub fn start(
 
     let rx = sender.subscribe();
     let mut programmer = Programmer {
+        subsys,
         tx: sender,
         rx,
         state: AwaitingAck,
         program,
-        cancellation_token,
     };
 
-    spawn(async move { programmer.run().await })
+    programmer.run().await;
+    Ok(())
 }
 
 impl Programmer {
     async fn run(&mut self) {
         loop {
             select! {
+                _ = self.subsys.on_shutdown_requested() => break,
                 message = self.rx.recv() => if self.handle_message(&message) == Done {
                     break;
                 },
-                _ = self.cancellation_token.cancelled() => break,
             }
         }
     }

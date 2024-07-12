@@ -1,30 +1,32 @@
 use crate::handlers::message::Message;
+use anyhow::Result;
+use tokio::select;
 use tokio::sync::broadcast::error::RecvError::{Closed, Lagged};
 use tokio::sync::broadcast::Receiver;
-use tokio::task::JoinHandle;
-use tokio::{select, spawn};
-use tokio_util::sync::CancellationToken;
+use tokio_graceful_shutdown::SubsystemHandle;
 
 struct Logger {
+    subsys: SubsystemHandle,
     rx: Receiver<Message>,
-    cancellation_token: CancellationToken,
 }
 
-pub fn start(rx: Receiver<Message>, cancellation_token: CancellationToken) -> JoinHandle<()> {
-    let mut logger = Logger {
-        rx,
-        cancellation_token,
-    };
-    spawn(async move { logger.run().await })
+pub async fn run(subsys: SubsystemHandle, rx: Receiver<Message>) -> Result<()> {
+    let mut logger = Logger { subsys, rx };
+    logger.run().await;
+    Ok(())
 }
 
 impl Logger {
     async fn run(&mut self) {
         loop {
             select! {
+                _ = self.subsys.on_shutdown_requested() => {
+                    eprintln!("Logger shutting down...");
+                    break
+                }
                 message = self.rx.recv() => {
                     match message {
-                        Ok(message) => log(&message),
+                        Ok(message) => eprintln!("Logging message: {message:?}"),
                         Err(Closed) => {
                             eprintln!("Logger can't receive any more messages, since there are no more senders.");
                             break;
@@ -34,15 +36,7 @@ impl Logger {
                         }
                     }
                 }
-                _ = self.cancellation_token.cancelled() => {
-                    eprintln!("Logger shutting down...");
-                    break
-                }
             }
         }
     }
-}
-
-fn log(message: &Message) {
-    eprintln!("Logging message: {message:?}");
 }

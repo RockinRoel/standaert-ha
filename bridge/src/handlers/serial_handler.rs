@@ -9,15 +9,14 @@ use slip_codec::tokio::SlipCodec;
 use slip_codec::SlipError;
 use std::time::Duration;
 use thiserror::Error;
+use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use tokio::{select, spawn};
+use tokio_graceful_shutdown::SubsystemHandle;
 use tokio_serial::{SerialPortBuilderExt, SerialStream};
 use tokio_util::bytes::Bytes;
 use tokio_util::codec::{Decoder, Framed};
-use tokio_util::sync::CancellationToken;
 
 const BAUD_RATE: u32 = 9600;
 
@@ -28,11 +27,11 @@ pub enum SerialHandlerError {
 }
 
 struct SerialHandler {
+    subsys: SubsystemHandle,
     framed_port: Framed<SerialStream, SlipCodec>,
     commands_buffer: Vec<Command>,
     rx: Receiver<Message>,
     tx: Sender<Message>,
-    cancellation_token: CancellationToken,
 }
 
 #[derive(Eq, PartialEq)]
@@ -41,30 +40,31 @@ enum HandleResult {
     Continue,
 }
 
-pub async fn start(
-    serial_port: String,
+pub async fn run(
+    subsys: SubsystemHandle,
+    serial_port: &str,
     sender: Sender<Message>,
-    cancellation_token: CancellationToken,
-) -> Result<JoinHandle<()>, SerialHandlerError> {
-    let serial_stream = tokio_serial::new(serial_port.clone(), BAUD_RATE).open_native_async()?;
+) -> Result<(), SerialHandlerError> {
+    let serial_stream = tokio_serial::new(serial_port, BAUD_RATE).open_native_async()?;
     let framed_port = SlipCodec::new().framed(serial_stream);
     let receiver = sender.subscribe();
 
     let mut serial_handler = SerialHandler {
+        subsys,
         framed_port,
         commands_buffer: vec![],
         rx: receiver,
         tx: sender,
-        cancellation_token,
     };
 
-    Ok(spawn(async move { serial_handler.run().await }))
+    serial_handler.run().await
 }
 
 impl SerialHandler {
-    async fn run(&mut self) {
+    async fn run(&mut self) -> Result<(), SerialHandlerError> {
         loop {
             select! {
+                _ = self.subsys.on_shutdown_requested() => break,
                 message = self.framed_port.next() => if self.handle_serial_message(message) == Break {
                     break;
                 },
@@ -72,9 +72,9 @@ impl SerialHandler {
                     break;
                 },
                 _ = sleep(Duration::from_millis(1)) => self.send_commands().await,
-                _ = self.cancellation_token.cancelled() => break,
             }
         }
+        Ok(())
     }
 
     fn handle_serial_message(&mut self, message: Option<Result<Bytes, SlipError>>) -> HandleResult {

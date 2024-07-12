@@ -3,25 +3,22 @@ use crate::controller::message::MessageBody::Command;
 use crate::handlers::message::Message;
 use crate::handlers::message::Message::SendToController;
 use std::time::Duration;
+use tokio::select;
 use tokio::sync::broadcast::Sender;
-use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use tokio::{select, spawn};
-use tokio_util::sync::CancellationToken;
+use tokio_graceful_shutdown::SubsystemHandle;
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(10);
 
 struct Refresher {
+    subsys: SubsystemHandle,
     tx: Sender<Message>,
-    cancellation_token: CancellationToken,
 }
 
-pub fn start(tx: Sender<Message>, cancellation_token: CancellationToken) -> JoinHandle<()> {
-    let refresher = Refresher {
-        tx,
-        cancellation_token,
-    };
-    spawn(async move { refresher.run().await })
+pub async fn run(subsys: SubsystemHandle, tx: Sender<Message>) -> Result<(), anyhow::Error> {
+    let refresher = Refresher { subsys, tx };
+    refresher.run().await;
+    Ok(())
 }
 
 impl Refresher {
@@ -29,8 +26,8 @@ impl Refresher {
         self.send_refresh();
         loop {
             select! {
+                _ = self.subsys.on_shutdown_requested() => break,
                 _ = sleep(REFRESH_INTERVAL) => self.send_refresh(),
-                _ = self.cancellation_token.cancelled() => break,
             }
         }
     }

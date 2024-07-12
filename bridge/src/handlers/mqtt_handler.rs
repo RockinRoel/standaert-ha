@@ -12,26 +12,26 @@ use rumqttc::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
+use tokio::select;
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::task::JoinHandle;
-use tokio::{join, select};
-use tokio_util::sync::CancellationToken;
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 
 #[derive(Clone)]
 struct MqttHandlerOptions {
     prefix: String,
     program: Option<Program>,
-    cancellation_token: CancellationToken,
     options: MqttOptions,
 }
 
 struct MqttHandlerClientTask {
+    subsys: SubsystemHandle,
     options: MqttHandlerOptions,
     client: AsyncClient,
     rx: Receiver<Message>,
 }
 
 struct MqttHandlerEventLoopTask {
+    subsys: SubsystemHandle,
     options: MqttHandlerOptions,
     event_loop: EventLoop,
     tx: Sender<Message>,
@@ -107,14 +107,14 @@ impl MqttHandlerOptions {
     }
 }
 
-pub async fn start(
+pub async fn run(
+    subsys: SubsystemHandle,
     url: String,
     credentials: Option<(String, String)>,
     prefix: String,
     program: Option<Program>,
     tx: Sender<Message>,
-    cancellation_token: CancellationToken,
-) -> Result<JoinHandle<()>, MqttHandlerError> {
+) -> Result<(), anyhow::Error> {
     let mut options = MqttOptions::parse_url(url)?;
     if let Some(credentials) = credentials {
         options.set_credentials(credentials.0, credentials.1);
@@ -122,32 +122,34 @@ pub async fn start(
     let handler_options = MqttHandlerOptions {
         prefix,
         program,
-        cancellation_token,
         options,
     };
     let (client, event_loop) = AsyncClient::new(handler_options.options.clone(), 10);
-    let mut client_task = MqttHandlerClientTask {
-        options: handler_options.clone(),
-        client: client.clone(),
-        rx: tx.subscribe(),
-    };
-    let mut event_loop_task = MqttHandlerEventLoopTask {
-        options: handler_options,
-        event_loop,
-        tx,
-    };
-    // TODO(Roel): announce and subscribe here!!!
-    let client_task = tokio::spawn(async move {
-        // TODO(Roel): handle ClientError?
-        client_task.run().await.unwrap();
-    });
-    let event_loop_task = tokio::spawn(async move {
-        // TODO(Roel): handle ConnectionError?
-        event_loop_task.run().await.unwrap();
-    });
-    Ok(tokio::spawn(async move {
-        let (_, _) = join!(client_task, event_loop_task);
-    }))
+    let options_clone = handler_options.clone();
+    let client_clone = client.clone();
+    let rx = tx.subscribe();
+    subsys.start(SubsystemBuilder::new("MQTT Client", |subsys| async move {
+        let mut client_task = MqttHandlerClientTask {
+            subsys,
+            options: options_clone,
+            client: client_clone,
+            rx,
+        };
+        client_task.run().await
+    }));
+    subsys.start(SubsystemBuilder::new(
+        "MQTT Event Loop",
+        |subsys| async move {
+            let mut event_loop_task = MqttHandlerEventLoopTask {
+                subsys,
+                options: handler_options,
+                event_loop,
+                tx,
+            };
+            event_loop_task.run().await
+        },
+    ));
+    Ok(())
 }
 
 impl MqttHandlerClientTask {
@@ -163,7 +165,7 @@ impl MqttHandlerClientTask {
                         Err(_) => break, // TODO(Roel): ok?
                     }
                 },
-                _ = self.options.cancellation_token.cancelled() => break,
+                _ = self.subsys.on_shutdown_requested() => break,
             }
         }
         Ok(())
@@ -303,6 +305,7 @@ impl MqttHandlerEventLoopTask {
     async fn run(&mut self) -> Result<(), ConnectionError> {
         loop {
             select! {
+                _ = self.subsys.on_shutdown_requested() => return Ok(()),
                 notification = self.event_loop.poll() => match notification {
                     Ok(event) => {
                         let prefix = format!("{}/light/{}/", self.options.prefix, self.options.options.client_id());
@@ -330,7 +333,6 @@ impl MqttHandlerEventLoopTask {
                     },
                     Err(err) => return Err(err),
                 },
-                _ = self.options.cancellation_token.cancelled() => return Ok(()),
             }
         }
     }
