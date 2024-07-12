@@ -1,13 +1,18 @@
-use std::collections::HashSet;
-use std::hash::Hash;
-use crate::shal::ast::{Action, Condition, EntityID, Input, InvalidEntityIDError, InvalidPinIDError, IODeclarations, Output, PinID, Program, Statement};
+use crate::shal::ast::{
+    Action, Condition, EntityID, IODeclarations, Input, InvalidEntityIDError, InvalidPinIDError,
+    Output, PinID, Program, Statement,
+};
 use crate::shal::common::{Edge, IsWas, Value};
+use crate::shal::parser::ParseError::{
+    DoubleInputPinError, DoubleOutputPinError, DuplicateEntityIDError,
+};
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 use regex::RegexBuilder;
+use std::collections::HashSet;
+use std::hash::Hash;
 use thiserror::Error;
-use crate::shal::parser::ParseError::{DoubleInputPinError, DoubleOutputPinError, DuplicateEntityIDError};
 
 #[derive(Parser)]
 #[grammar = "shal/shal.pest"]
@@ -20,17 +25,11 @@ pub enum ParseError {
     #[error("Failed to parse program")]
     PestParseError(#[from] Box<pest::error::Error<Rule>>),
     #[error("Duplicate entity id: {id}, all entity ids must be unique")]
-    DuplicateEntityIDError {
-        id: EntityID,
-    },
+    DuplicateEntityIDError { id: EntityID },
     #[error("Double use of input pin {pin} for two different inputs")]
-    DoubleInputPinError {
-        pin: PinID,
-    },
+    DoubleInputPinError { pin: PinID },
     #[error("Double use of output pin {pin} for two different outputs")]
-    DoubleOutputPinError {
-        pin: PinID,
-    },
+    DoubleOutputPinError { pin: PinID },
     #[error("Invalid pin ID")]
     InvalidPinIDError(#[from] InvalidPinIDError),
     #[error("Invalid entity ID")]
@@ -389,7 +388,9 @@ mod tests {
             &parse("toggle output 1;").unwrap(),
             &Program {
                 declarations: Default::default(),
-                statements: vec![Statement::Action(Action::Toggle(Output::Number(1.try_into().unwrap())),)],
+                statements: vec![Statement::Action(Action::Toggle(Output::Number(
+                    1.try_into().unwrap()
+                )),)],
             }
         );
         assert_eq!(
@@ -428,7 +429,9 @@ mod tests {
                 statements: vec![Statement::Event {
                     edge: common::Edge::Rising,
                     input: Input::Number(3.try_into().unwrap()),
-                    statements: vec![Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),],
+                    statements: vec![Statement::Action(Action::Toggle(Output::Number(
+                        4.try_into().unwrap()
+                    ))),],
                 },]
             }
         );
@@ -441,7 +444,10 @@ mod tests {
                     input: Input::Number(5.try_into().unwrap()),
                     statements: vec![
                         Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),
-                        Statement::Action(Action::Set(Output::Number(6.try_into().unwrap()), Value::High,)),
+                        Statement::Action(Action::Set(
+                            Output::Number(6.try_into().unwrap()),
+                            Value::High,
+                        )),
                     ],
                 },]
             }
@@ -453,7 +459,11 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Xor(
-                        Box::new(Condition::Input(Input::Number(4.try_into().unwrap()), IsWas::Is, Value::Low)),
+                        Box::new(Condition::Input(
+                            Input::Number(4.try_into().unwrap()),
+                            IsWas::Is,
+                            Value::Low
+                        )),
                         Box::new(Condition::Entity(
                             "light_upstairs".try_into().unwrap(),
                             IsWas::Was,
@@ -461,7 +471,9 @@ mod tests {
                         )),
                     ),
                     vec![],
-                    vec![Statement::Action(Action::Toggle(Output::Number(4.try_into().unwrap()))),],
+                    vec![Statement::Action(Action::Toggle(Output::Number(
+                        4.try_into().unwrap()
+                    ))),],
                 )],
             }
         );
@@ -471,7 +483,11 @@ mod tests {
                 declarations: Default::default(),
                 statements: vec![Statement::IfElse(
                     Condition::Or(
-                        Box::new(Condition::Output(Output::Number(5.try_into().unwrap()), IsWas::Is, Value::High)),
+                        Box::new(Condition::Output(
+                            Output::Number(5.try_into().unwrap()),
+                            IsWas::Is,
+                            Value::High
+                        )),
                         Box::new(Condition::Output(
                             Output::Number(20.try_into().unwrap()),
                             IsWas::Is,

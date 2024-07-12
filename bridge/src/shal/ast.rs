@@ -1,8 +1,8 @@
 use crate::shal::common::{Edge, IsWas, Value};
+use regex::RegexBuilder;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use regex::RegexBuilder;
 use thiserror::Error;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -30,7 +30,10 @@ impl TryFrom<String> for EntityID {
     type Error = InvalidEntityIDError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let entity_id_regex = RegexBuilder::new("^[A-Za-z][A-Za-z0-9_]*$").unicode(false).build().unwrap_or_else(|_| unreachable!());
+        let entity_id_regex = RegexBuilder::new("^[A-Za-z][A-Za-z0-9_]*$")
+            .unicode(false)
+            .build()
+            .unwrap_or_else(|_| unreachable!());
         if entity_id_regex.is_match(&value) {
             Ok(EntityID { id: value })
         } else {

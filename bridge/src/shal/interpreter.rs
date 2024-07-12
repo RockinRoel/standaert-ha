@@ -197,7 +197,10 @@ fn run_program(
                 state.output_new.set((*output).into(), !before).unwrap();
             }
             Instruction::Set { output, value } if state.stack.all_one() => {
-                state.output_new.set((*output).into(), value.as_bit()).unwrap();
+                state
+                    .output_new
+                    .set((*output).into(), value.as_bit())
+                    .unwrap();
             }
             _ => {}
         }
@@ -221,13 +224,17 @@ mod tests {
                     input: 0.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 0.try_into().unwrap() },
+                Toggle {
+                    output: 0.try_into().unwrap(),
+                },
                 Pop,
                 On {
                     input: 1.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 1.try_into().unwrap() },
+                Toggle {
+                    output: 1.try_into().unwrap(),
+                },
                 Pop,
                 If {
                     number: 0.try_into().unwrap(),

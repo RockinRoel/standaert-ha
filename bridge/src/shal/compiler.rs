@@ -22,7 +22,10 @@ pub enum CompileError {
     },
 }
 
-fn retrieve_input(declarations: &IODeclarations, input: &ast::Input) -> Result<PinID, CompileError> {
+fn retrieve_input(
+    declarations: &IODeclarations,
+    input: &ast::Input,
+) -> Result<PinID, CompileError> {
     match input {
         ast::Input::Number(number) => Ok(*number),
         ast::Input::Entity(entity_id) => {
@@ -220,25 +223,40 @@ mod tests {
                 inputs: HashMap::from([
                     (
                         "button_downstairs".try_into().unwrap(),
-                        IODeclaration { pin: 0.try_into().unwrap(), name: None },
+                        IODeclaration {
+                            pin: 0.try_into().unwrap(),
+                            name: None,
+                        },
                     ),
                     (
                         "button_upstairs".try_into().unwrap(),
-                        IODeclaration { pin: 1.try_into().unwrap(), name: None },
+                        IODeclaration {
+                            pin: 1.try_into().unwrap(),
+                            name: None,
+                        },
                     ),
                 ]),
                 outputs: HashMap::from([
                     (
                         "light_downstairs".try_into().unwrap(),
-                        IODeclaration { pin: 0.try_into().unwrap(), name: None },
+                        IODeclaration {
+                            pin: 0.try_into().unwrap(),
+                            name: None,
+                        },
                     ),
                     (
                         "light_upstairs".try_into().unwrap(),
-                        IODeclaration { pin: 1.try_into().unwrap(), name: None },
+                        IODeclaration {
+                            pin: 1.try_into().unwrap(),
+                            name: None,
+                        },
                     ),
                     (
                         "light_stairs".try_into().unwrap(),
-                        IODeclaration { pin: 2.try_into().unwrap(), name: None },
+                        IODeclaration {
+                            pin: 2.try_into().unwrap(),
+                            name: None,
+                        },
                     ),
                 ]),
             },
@@ -289,25 +307,40 @@ mod tests {
                     inputs: HashMap::from([
                         (
                             "button_downstairs".try_into().unwrap(),
-                            IODeclaration { pin: 0.try_into().unwrap(), name: None }
+                            IODeclaration {
+                                pin: 0.try_into().unwrap(),
+                                name: None
+                            }
                         ),
                         (
                             "button_upstairs".try_into().unwrap(),
-                            IODeclaration { pin: 1.try_into().unwrap(), name: None }
+                            IODeclaration {
+                                pin: 1.try_into().unwrap(),
+                                name: None
+                            }
                         ),
                     ]),
                     outputs: HashMap::from([
                         (
                             "light_downstairs".try_into().unwrap(),
-                            IODeclaration { pin: 0.try_into().unwrap(), name: None }
+                            IODeclaration {
+                                pin: 0.try_into().unwrap(),
+                                name: None
+                            }
                         ),
                         (
                             "light_upstairs".try_into().unwrap(),
-                            IODeclaration { pin: 1.try_into().unwrap(), name: None }
+                            IODeclaration {
+                                pin: 1.try_into().unwrap(),
+                                name: None
+                            }
                         ),
                         (
                             "light_stairs".try_into().unwrap(),
-                            IODeclaration { pin: 2.try_into().unwrap(), name: None }
+                            IODeclaration {
+                                pin: 2.try_into().unwrap(),
+                                name: None
+                            }
                         ),
                     ]),
                 },
@@ -316,13 +349,17 @@ mod tests {
                         input: 0.try_into().unwrap(),
                         edge: Edge::Rising,
                     },
-                    Instruction::Toggle { output: 0.try_into().unwrap() },
+                    Instruction::Toggle {
+                        output: 0.try_into().unwrap()
+                    },
                     Instruction::Pop,
                     Instruction::On {
                         input: 1.try_into().unwrap(),
                         edge: Edge::Rising,
                     },
-                    Instruction::Toggle { output: 1.try_into().unwrap() },
+                    Instruction::Toggle {
+                        output: 1.try_into().unwrap()
+                    },
                     Instruction::Pop,
                     Instruction::If {
                         number: 0.try_into().unwrap(),

@@ -3,6 +3,7 @@ use crate::controller::event::Event;
 use crate::controller::message::MessageBody;
 use crate::handlers::message::Message;
 use crate::handlers::message::Message::ReceivedFromController;
+use crate::shal::ast::PinID;
 use crate::shal::bytecode::Program;
 use if_chain::if_chain;
 use rumqttc::{
@@ -15,7 +16,6 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
-use crate::shal::ast::PinID;
 
 #[derive(Clone)]
 struct MqttHandlerOptions {

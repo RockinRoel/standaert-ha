@@ -199,7 +199,9 @@ impl Instruction {
                 }
                 InstructionEncoding::dual_byte(instr, output.into())
             }
-            Instruction::Toggle { output } => InstructionEncoding::dual_byte(INSTR_TOGGLE, output.into()),
+            Instruction::Toggle { output } => {
+                InstructionEncoding::dual_byte(INSTR_TOGGLE, output.into())
+            }
             Instruction::On { input, edge } => {
                 let mut instr = INSTR_ON;
                 if edge.as_bit() {
@@ -248,7 +250,9 @@ impl Instruction {
                         value: Value::from_bit(instr & SET_VALUE_MASK != 0),
                     })
                 } else if instr & INSTR_TOGGLE_MASK == INSTR_TOGGLE {
-                    Ok(Instruction::Toggle { output: value.try_into().unwrap() })
+                    Ok(Instruction::Toggle {
+                        output: value.try_into().unwrap(),
+                    })
                 } else if instr & INSTR_ON_MASK == INSTR_ON {
                     Ok(Instruction::On {
                         input: value.try_into().unwrap(),
@@ -455,13 +459,17 @@ mod tests {
                     input: 0.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 0.try_into().unwrap() },
+                Toggle {
+                    output: 0.try_into().unwrap(),
+                },
                 Pop,
                 On {
                     input: 1.try_into().unwrap(),
                     edge: Edge::Rising,
                 },
-                Toggle { output: 1.try_into().unwrap() },
+                Toggle {
+                    output: 1.try_into().unwrap(),
+                },
                 Pop,
                 If {
                     number: 0.try_into().unwrap(),
