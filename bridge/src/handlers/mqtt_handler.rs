@@ -11,10 +11,13 @@ use rumqttc::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::panic;
+use log::warn;
 use thiserror::Error;
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::task::JoinHandle;
-use tokio::{select, spawn};
+use tokio::task::JoinSet;
+use tokio::select;
+use tokio::sync::broadcast::error::RecvError;
 use tokio_util::sync::CancellationToken;
 
 const BUF_SIZE: usize = 100;
@@ -31,7 +34,7 @@ pub struct MqttHandler {
     config: MqttHandlerConfig,
     client: AsyncClient,
     rx: Receiver<Message>,
-    event_loop_handle: JoinHandle<Result<(), MqttHandlerError>>,
+    join_set: JoinSet<Result<(), MqttHandlerError>>,
     event_loop_cancellation_token: CancellationToken,
 }
 
@@ -67,25 +70,26 @@ impl MqttHandler {
             event_loop,
             tx,
         };
-        let event_loop_handle = spawn(async move { event_loop.run().await });
+        let mut join_set = JoinSet::new();
+        join_set.spawn(async move { event_loop.run().await });
         let mut mqtt_handler = MqttHandler {
             cancellation_token,
             config,
             client,
             rx,
-            event_loop_handle,
+            join_set,
             event_loop_cancellation_token,
         };
         let result = mqtt_handler.announce().await;
         if let Err(e) = result {
             mqtt_handler.event_loop_cancellation_token.cancel();
-            let _ = mqtt_handler.event_loop_handle.await;
+            let _ = mqtt_handler.join_set.join_next().await;
             return Err(e.into());
         }
         let result = mqtt_handler.subscribe().await;
         if let Err(e) = result {
             mqtt_handler.event_loop_cancellation_token.cancel();
-            let _ = mqtt_handler.event_loop_handle.await;
+            let _ = mqtt_handler.join_set.join_next().await;
             return Err(e.into());
         }
         Ok(mqtt_handler)
@@ -161,29 +165,49 @@ impl MqttHandler {
     }
 
     pub async fn run(mut self) -> Result<(), MqttHandlerError> {
+        let mut error: Option<MqttHandlerError> = None;
         loop {
             select! {
-                _ = self.cancellation_token.cancelled() => {
-                    self.event_loop_cancellation_token.cancel();
-                    return self.event_loop_handle.await.unwrap_or(Ok(()));
-                }
-                _ = self.event_loop_cancellation_token.cancelled() => {
-                    return self.event_loop_handle.await.unwrap_or(Ok(()));
-                }
+                _ = self.cancellation_token.cancelled() => break,
+                join_result = self.join_set.join_next() => match join_result {
+                    Some(Ok(Ok(()))) => break,
+                    Some(Ok(Err(e))) => {
+                        error = Some(e);
+                        break;
+                    }
+                    Some(Err(e)) => if let Ok(panic) = e.try_into_panic() {
+                        panic::resume_unwind(panic)
+                    } else {
+                        break;
+                    },
+                    None => break,
+                },
                 message = self.rx.recv() => {
                     match message {
                         Ok(ReceivedFromController(body)) => {
                             if let Err(e) = self.handle_message_from_controller(&body).await {
-                                self.event_loop_cancellation_token.cancel();
-                                let _ = self.event_loop_handle.await;
-                                return Err(e.into());
+                                error = Some(e.into());
+                                break;
                             }
                         }
                         Ok(_) => {}
-                        Err(_) => {} // TODO(Roel): ???
+                        Err(RecvError::Closed) => break,
+                        Err(RecvError::Lagged(n)) => {
+                            warn!("MQTT handler lagged behind {n} messages!");
+                        }
                     }
                 },
             }
+        }
+        self.event_loop_cancellation_token.cancel();
+        match self.join_set.join_next().await {
+            Some(Ok(result)) => error.map_or(result, Err),
+            Some(Err(e)) => if let Ok(panic) = e.try_into_panic() {
+                panic::resume_unwind(panic)
+            } else {
+                error.map_or(Ok(()), Err)
+            }
+            None => error.map_or(Ok(()), Err)
         }
     }
 
