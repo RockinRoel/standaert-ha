@@ -27,6 +27,7 @@ pub struct MqttHandlerConfig {
     prefix: String,
     program: Option<Program>,
     options: MqttOptions,
+    advertise_nonvars: bool,
 }
 
 pub struct MqttHandler {
@@ -114,6 +115,10 @@ impl MqttHandler {
 
     async fn announce(&mut self) -> Result<(), ClientError> {
         for i in 0..32 {
+            let i: PinID = i.try_into().unwrap();
+            if !self.config.should_advertise_input(i) {
+                continue;
+            }
             let prefix = format!(
                 "{}/binary_sensor/{}/{}",
                 self.config.prefix,
@@ -123,8 +128,8 @@ impl MqttHandler {
             let discovery_topic = format!("{}/config", prefix);
             let state_topic = format!("{}/pressed", prefix);
             let spec = BinarySensorSpec {
-                unique_id: self.config.unique_input_id(i.try_into().unwrap()),
-                name: self.config.input_name(i.try_into().unwrap()),
+                unique_id: self.config.unique_input_id(i),
+                name: self.config.input_name(i),
                 icon: "mdi:light-switch-off".to_string(),
                 state_topic: state_topic.clone(),
             };
@@ -142,6 +147,10 @@ impl MqttHandler {
         }
         // Announce lights
         for i in 0..32 {
+            let i: PinID = i.try_into().unwrap();
+            if !self.config.should_advertise_output(i) {
+                continue;
+            }
             let prefix = format!(
                 "{}/light/{}/{}",
                 self.config.prefix,
@@ -152,8 +161,8 @@ impl MqttHandler {
             let state_topic = format!("{}/status", prefix);
             let command_topic = format!("{}/switch", prefix);
             let spec = LightSpec {
-                unique_id: self.config.unique_output_id(i.try_into().unwrap()),
-                name: self.config.output_name(i.try_into().unwrap()),
+                unique_id: self.config.unique_output_id(i),
+                name: self.config.output_name(i),
                 state_topic: state_topic.clone(),
                 command_topic: command_topic.clone(),
             };
@@ -271,6 +280,7 @@ impl MqttHandlerConfig {
         program: Option<Program>,
         url: String,
         credentials: Option<(String, String)>,
+        advertise_nonvars: bool,
     ) -> Result<Self, MqttHandlerError> {
         let mut options = MqttOptions::parse_url(url)?;
         if let Some(credentials) = credentials {
@@ -280,7 +290,21 @@ impl MqttHandlerConfig {
             prefix,
             program,
             options,
+            advertise_nonvars,
         })
+    }
+
+    fn should_advertise_input(&self, pin: PinID) -> bool {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some(declaration) = program.declarations.inputs.values().find(|&declaration| declaration.pin == pin);
+            if let Some(_) = &declaration.name;
+            then {
+                true
+            } else {
+                false
+            }
+        )
     }
 
     fn input_name(&self, pin: PinID) -> String {
@@ -312,6 +336,19 @@ impl MqttHandlerConfig {
         let client_id = &self.options.client_id();
         let input_id = self.input_id(pin);
         format!("{client_id}_input_{input_id}")
+    }
+
+    fn should_advertise_output(&self, pin: PinID) -> bool {
+        if_chain!(
+            if let Some(program) = &self.program;
+            if let Some(declaration) = program.declarations.outputs.values().find(|&declaration| declaration.pin == pin);
+            if let Some(_) = &declaration.name;
+            then {
+                true
+            } else {
+                false
+            }
+        )
     }
 
     fn output_name(&self, pin: PinID) -> String {

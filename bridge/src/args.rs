@@ -31,6 +31,11 @@ pub struct Args {
     /// Determines whether we actually upload the program
     #[arg(long, default_value_t = false, env = "SHA_UPLOAD")]
     pub upload: bool,
+
+    /// Whether inputs and outputs that were not declared in the SHAL program should be advertised
+    /// to MQTT
+    #[arg(long, default_value_t = true, env = "SHA_ADVERTISE_NONVARS")]
+    pub advertise_nonvars: bool,
 }
 
 impl Display for Args {

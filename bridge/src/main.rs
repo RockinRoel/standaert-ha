@@ -104,6 +104,7 @@ async fn spawn_tasks(
             program.clone(),
             mqtt_url.clone(),
             credentials,
+            args.advertise_nonvars,
         )?;
         let sender = sender.clone();
         let handler = MqttHandler::new(cancellation_token.clone(), config, sender).await?;
