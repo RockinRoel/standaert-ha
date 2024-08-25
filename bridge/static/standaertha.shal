@@ -280,18 +280,18 @@ on fedge dha2_1 toggle output 7; // Wat is output 7???
 on fedge dov toggle licht_overloop;
 on fedge dha3_1 toggle licht_overloop;
 on fedge dha1 {
-  toggle hal1;
-  toggle hal2;
+  toggle licht_hal1;
+  toggle licht_hal2;
 }
 on fedge dha2_2 {
-  toggle hal1;
-  toggle hal2;
+  toggle licht_hal1;
+  toggle licht_hal2;
 }
 on fedge dha3_2 {
-  toggle hal1;
-  toggle hal2;
+  toggle licht_hal1;
+  toggle licht_hal2;
 }
-if hal1 is high or hal2 is high or licht_overloop is high {
+if licht_hal1 is high or licht_hal2 is high or licht_overloop is high {
   set licht_trap high;
 } else {
   set licht_trap low;
