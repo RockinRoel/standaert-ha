@@ -295,6 +295,9 @@ impl MqttHandlerConfig {
     }
 
     fn should_advertise_input(&self, pin: PinID) -> bool {
+        if self.advertise_nonvars {
+            return true;
+        }
         if_chain!(
             if let Some(program) = &self.program;
             if let Some(declaration) = program.declarations.inputs.values().find(|&declaration| declaration.pin == pin);
@@ -339,6 +342,9 @@ impl MqttHandlerConfig {
     }
 
     fn should_advertise_output(&self, pin: PinID) -> bool {
+        if self.advertise_nonvars {
+            return true;
+        }
         if_chain!(
             if let Some(program) = &self.program;
             if let Some(declaration) = program.declarations.outputs.values().find(|&declaration| declaration.pin == pin);
