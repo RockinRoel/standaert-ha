@@ -1,5 +1,227 @@
 {
+  inputs: {
+    dsl1: {
+      pin: 0
+      name: Kamer 1
+    }
+    dsl2: {
+      pin: 2
+      name: Kamer 2
+    }
+    dsl3: {
+      pin: 3
+      name: Kamer 3
+    }
+    dsl4: {
+      pin: 4
+      name: Kamer 4
+    }
+    dwc2: {
+      pin: 1
+      name: WC Boven
+    }
+    dzo: {
+      pin: 5
+      name: Zolder
+    }
+    dov: {
+      pin: 6
+      name: Overloop
+    }
+    dee1_1: {
+      pin: 7
+      name: Eetkamer links boven
+    }
+    dee1_2: {
+      pin: 8
+      name: Eetkamer rechts boven / Salon rechts
+    }
+    dee1_3: {
+      pin: 9
+      name: Eetkamer onder / Salon links
+    }
+    dha1: {
+      pin: 11
+      name: Hal 1
+    }
+    dha2_1: {
+      pin: 12
+      name: Hal 2 boven
+    }
+    dha2_2: {
+      pin: 13
+      name: Hal 2 onder
+    }
+    dbu: {
+      pin: 14
+      name: Bureau
+    }
+    dha3_1: {
+      pin: 15
+      name: Hal 3 boven
+    }
+    dha3_2: {
+      pin: 16
+      name: Hal 3 onder
+    }
+    dsa3_1: {
+      pin: 17
+      name: Sas buiten
+    }
+    dwc1: {
+      pin: 18
+      name: WC beneden
+    }
+    dwp1_2: {
+      pin: 19
+      name: Douche beneden
+    }
+    dwp1_3: {
+      pin: 20
+      name: Wasplaats
+    }
+    dsa1: {
+      pin: 21
+      name: Sas
+    }
+    dga1: {
+      pin: 22
+      name: Garage
+    }
+    dkb: {
+      pin: 23
+      name: Koele berging
+    }
+    dke3: {
+      pin: 24
+      name: Keuken 3
+    }
+    dke2_2: {
+      pin: 25
+      name: Keuken 2 rechts
+    }
+    dke2_1: {
+      pin: 26
+      name: Keuken 2 links
+    }
+    dke1_1: {
+      pin: 27
+      name: Keuken 1 links boven
+    }
+    dke1_2: {
+      pin: 28
+      name: Keuken 1 rechts boven
+    }
+    dke1_3: {
+      pin: 29
+      name: Keuken 1 links onder
+    }
+    dke1_4: {
+      pin: 30
+      name: Keuken 1 rechts onder
+    }
+  }
   outputs: {
+    licht_kamer1: {
+      pin: 4
+      name: Kamer 1
+    }
+    licht_kamer2: {
+      pin: 24
+      name: Kamer 2
+    }
+    licht_kamer3: {
+      pin: 2
+      name: Kamer 3
+    }
+    licht_kamer4: {
+      pin: 0
+      name: Kamer 4
+    }
+    licht_wc_boven: {
+      pin: 3
+      name: WC Boven
+    }
+    licht_zolder: {
+      pin: 17
+      name: Zolder
+    }
+    licht_terras: {
+      pin: 13
+      name: Terras
+    }
+    licht_salon: {
+      pin: 16
+      name: Salon
+    }
+    licht_eetkamer: {
+      pin: 6
+      name: Eetkamer
+    }
+    licht_bureau: {
+      pin: 31
+      name: Bureau
+    }
+    licht_buiten_achterdeur: {
+      pin: 28
+      name: Buiten achterdeur
+    }
+    licht_buiten_zijgevel: {
+      pin: 29
+      name: Buiten zijgevel
+    }
+    licht_wc_beneden: {
+      pin: 26
+      name: WC beneden
+    }
+    licht_douche_beneden: {
+      pin: 11
+      name: Douche beneden
+    }
+    licht_wasplaats: {
+      pin: 30
+      name: Wasplaats
+    }
+    licht_sas: {
+      pin: 8
+      name: Sas
+    }
+    licht_garage: {
+      pin: 18
+      name: Garage
+    }
+    licht_koele_berging: {
+      pin: 14
+      name: Koele berging
+    }
+    licht_keuken_tafel: {
+      pin: 15
+      name: Keuken tafel
+    }
+    licht_keuken_midden: {
+      pin: 12
+      name: Keuken midden
+    }
+    licht_keuken_aanrecht_boven: {
+      pin: 27
+      name: Keuken aanrecht boven
+    }
+    licht_keuken_aanrecht_onder: {
+      pin: 10
+      name: Keuken aanrecht onder
+    }
+    licht_hal1: {
+      pin: 5
+      name: Hal 1
+    }
+    licht_hal2: {
+      pin: 25
+      name: Hal 2
+    }
+    licht_overloop: {
+      pin: 20
+      name: Overloop
+    }
     licht_trap: {
       pin: 22
       name: Trap
@@ -20,53 +242,74 @@
 // Unused inputs: 10
 // Unused outputs: 1, 9, 21
 
-on fedge input 0 toggle output 4;
-on fedge input 1 toggle output 3;
-on fedge input 2 toggle output 24;
-on fedge input 3 toggle output 2;
-on fedge input 4 toggle output 0;
-on fedge input 5 toggle output 17;
-on fedge input 7 toggle output 13;
-on fedge input 8 toggle output 16;
-on fedge input 9 toggle output 6;
-on fedge input 12 toggle output 7;
-on fedge input 14 toggle output 31;
-on fedge input 17 {
-  toggle output 28;
-  toggle output 29;
-}
-on fedge input 18 toggle output 26;
-on fedge input 19 toggle output 11;
-on fedge input 20 toggle output 30;
-on fedge input 21 toggle output 8;
-on fedge input 22 toggle output 18;
-on fedge input 23 toggle output 14;
-on fedge input 24 toggle output 15;
-on fedge input 25 toggle output 15;
-on fedge input 26 toggle output 12;
-on fedge input 27 toggle output 27;
-on fedge input 28 toggle output 12;
-on fedge input 29 toggle output 10;
-on fedge input 30 toggle output 15;
-on fedge input 31 toggle output 23;
+//// Gelijkvloers
 
-// Hal, overloop en trap
-on fedge input 6 toggle output 20;
-on fedge input 15 toggle output 20;
-on fedge input 11 {
-  toggle output 5;
-  toggle output 25;
+// Bureau
+on fedge dbu toggle licht_bureau;
+
+// Eetkamer en salon
+on fedge dee1_1 toggle licht_terras;
+on fedge dee1_2 toggle licht_salon;
+on fedge dee1_3 toggle licht_eetkamer;
+
+// Keuken
+on fedge dkb toggle licht_koele_berging;
+on fedge dke3 toggle licht_keuken_tafel;
+on fedge dke2_2 toggle licht_keuken_tafel;
+on fedge dke1_4 toggle licht_keuken_tafel;
+on fedge dke2_1 toggle licht_keuken_midden;
+on fedge dke1_2 toggle licht_keuken_midden;
+on fedge dke1_1 toggle licht_keuken_aanrecht_boven;
+on fedge dke1_3 toggle licht_keuken_aanrecht_onder;
+
+// Sas, wasplaats en garage
+on fedge dwp1_2 toggle licht_douche_beneden;
+on fedge dwp1_3 toggle licht_wasplaats;
+on fedge dsa1 toggle licht_sas;
+on fedge dga1 toggle licht_garage;
+on fedge dsa3_1 {
+  toggle licht_buiten_achterdeur;
+  toggle licht_buiten_zijgevel;
 }
-on fedge input 13 {
-  toggle output 5;
-  toggle output 25;
+
+// WC
+on fedge dwc1 toggle licht_wc_beneden;
+
+//// Hal, overloop en trap
+on fedge dha2_1 toggle output 7; // Wat is output 7???
+on fedge dov toggle licht_overloop;
+on fedge dha3_1 toggle licht_overloop;
+on fedge dha1 {
+  toggle hal1;
+  toggle hal2;
 }
-on fedge input 16 {
-  toggle output 5;
-  toggle output 25;
+on fedge dha2_2 {
+  toggle hal1;
+  toggle hal2;
 }
-if output 20 is high or output 5 is high {
+on fedge dha3_2 {
+  toggle hal1;
+  toggle hal2;
+}
+if hal1 is high or hal2 is high or licht_overloop is high {
   set licht_trap high;
 } else {
   set licht_trap low;
 }
+
+//// 1ste verdieping
+
+// WC
+on fedge dwc2 toggle licht_wc_boven;
+
+// Kamers
+on fedge dsl1 toggle licht_kamer1;
+on fedge dsl2 toggle licht_kamer2;
+on fedge dsl3 toggle licht_kamer3;
+on fedge dsl4 toggle licht_kamer4;
+
+// Zolder
+on fedge dzo toggle licht_zolder;
+
+//// Unused?
+on fedge input 31 toggle output 23;
