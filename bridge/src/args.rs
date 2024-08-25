@@ -34,7 +34,7 @@ pub struct Args {
 
     /// Whether inputs and outputs that were not declared in the SHAL program should be advertised
     /// to MQTT
-    #[arg(long, default_value_t = true, env = "SHA_ADVERTISE_NONVARS")]
+    #[arg(long, default_value_t = false, env = "SHA_ADVERTISE_NONVARS")]
     pub advertise_nonvars: bool,
 }
 
