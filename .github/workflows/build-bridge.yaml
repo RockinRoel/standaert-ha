@@ -1,0 +1,40 @@
+name: Build Standaert Home Assistant bridge
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arch64
+            runner: ubuntu-24.04-arm
+
+    name: Build sha_bridge for arch ${{ matrix.arch }}
+
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Install toolchain
+        run: rustup update stable && rustup default stable
+    
+      - name: Do cargo build
+        working-directory: ./bridge
+        run: cargo build --verbose --release
+
+      - name: Run tests
+        working-directory: ./bridge
+        run: cargo test --verbose --release
